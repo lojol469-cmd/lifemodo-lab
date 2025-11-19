@@ -42,6 +42,18 @@ try:
 except ImportError:
     LEROBOT_AVAILABLE = False
 
+# LangChain imports
+from langchain.agents import initialize_agent, AgentType, AgentExecutor
+from langchain.tools import BaseTool, tool
+from langchain.prompts import PromptTemplate
+from langchain.llms.base import LLM
+from langchain_core.callbacks import CallbackManagerForToolRun
+from langchain_community.llms.huggingface_pipeline import HuggingFacePipeline
+from typing import Optional, Type, Any
+import base64
+from io import BytesIO
+from pydantic import Field
+
 # Charger les variables d'environnement
 dotenv.load_dotenv()
 HF_TOKEN = os.getenv('HF_TOKEN')
@@ -84,6 +96,408 @@ else:
 # Vérification GPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
 st.sidebar.info(f"Device détecté : {device.upper()}")
+
+# Chargement global du modèle Mistral
+def load_mistral_model():
+    """Charge le modèle Mistral 7B en 4-bit quantization"""
+    try:
+        model_path = os.path.join(LLM_DIR, "mistral-7b")
+
+        if not os.path.exists(model_path):
+            st.error("❌ Modèle Mistral non trouvé. Téléchargez-le d'abord.")
+            return None, None
+
+        # Configuration 4-bit quantization
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True
+        )
+
+        # Charger tokenizer et modèle
+        tokenizer = AutoTokenizer.from_pretrained(model_path, token=HF_TOKEN)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            quantization_config=bnb_config,
+            device_map="auto",
+            token=HF_TOKEN
+        )
+
+        # Créer pipeline
+        pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            max_new_tokens=512,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.95,
+            repetition_penalty=1.15
+        )
+
+        return pipe, tokenizer
+    except Exception as e:
+        st.error(f"Erreur chargement Mistral: {str(e)}")
+        return None, None
+
+@st.cache_resource
+def get_mistral_pipe():
+    """Charge et retourne le pipeline Mistral de manière globale"""
+    try:
+        pipe, _ = load_mistral_model()
+        return pipe
+    except Exception as e:
+        st.error(f"Erreur chargement Mistral global: {e}")
+        return None
+
+mistral_pipe = get_mistral_pipe()
+
+# ============ LANGCHAIN TOOLS & AGENT ============
+
+class VisionAnalysisTool(BaseTool):
+    """Outil LangChain pour l'analyse d'images avec YOLO"""
+    name: str = "vision_analyzer"
+    description: str = "Analyse une image pour détecter des objets, du texte, et fournir une description détaillée. Utile pour l'inspection visuelle, la reconnaissance d'objets, et l'analyse de scènes."
+
+    def _run(self, image_path: str, run_manager: Optional[CallbackManagerForToolRun] = None) -> str:
+        """Exécute l'analyse d'image"""
+        try:
+            if not os.path.exists(image_path):
+                return f"Erreur: Image non trouvée: {image_path}"
+
+            # Charger le modèle de vision
+            vision_model_path = os.path.join(MODEL_DIR, "vision_model/weights/best.pt")
+            if os.path.exists(vision_model_path):
+                model = YOLO(vision_model_path)
+            else:
+                model = YOLO("yolov8n.pt")  # Fallback
+
+            # Analyse avec YOLO
+            results = model(image_path)
+
+            # OCR si disponible
+            ocr_text = ""
+            try:
+                _, _, annotations = ocr_and_annotate(image_path)
+                if annotations:
+                    ocr_text = f"Texte détecté: {len(annotations)} éléments textuels trouvés."
+            except:
+                pass
+
+            # Résumé des résultats
+            detections = []
+            if results and len(results) > 0:
+                for result in results:
+                    if result.boxes:
+                        for box in result.boxes:
+                            detections.append(f"Objet détecté (confiance: {box.conf.item():.2f})")
+
+            analysis = f"Analyse visuelle de {os.path.basename(image_path)}:\n"
+            analysis += f"- Objets détectés: {len(detections)}\n"
+            analysis += f"- OCR: {ocr_text}\n"
+            analysis += f"- Résolution: Image analysée avec modèle YOLO"
+
+            return analysis
+
+        except Exception as e:
+            return f"Erreur lors de l'analyse visuelle: {str(e)}"
+
+class AudioProcessingTool(BaseTool):
+    """Outil LangChain pour le traitement audio"""
+    name: str = "audio_processor"
+    description: str = "Traite des fichiers audio pour transcription, analyse de contenu, et extraction d'informations. Supporte la transcription multilingue et l'analyse sémantique."
+
+    def _run(self, input_data: str, run_manager: Optional[CallbackManagerForToolRun] = None) -> str:
+        """Exécute le traitement audio"""
+        try:
+            # Parse input data - can be a simple path or JSON string
+            try:
+                params = json.loads(input_data)
+                audio_path = params.get("audio_path", input_data)
+                task = params.get("task", "transcribe")
+            except json.JSONDecodeError:
+                # If not JSON, treat as simple audio path
+                audio_path = input_data
+                task = "transcribe"
+
+            if not os.path.exists(audio_path):
+                return f"Erreur: Fichier audio non trouvé: {audio_path}"
+
+            if task == "transcribe":
+                # Transcription
+                result = process_audio_for_translation(audio_path)
+                if result and result.get('text'):
+                    return f"Transcription: {result['text']} (Langue détectée: {result.get('language', 'inconnue')})"
+                else:
+                    return "Erreur: Transcription échouée"
+
+            elif task == "analyze":
+                # Analyse de contenu
+                transcription = process_audio_for_translation(audio_path)
+                if transcription and transcription.get('text'):
+                    analysis = analyze_audio_content(transcription['text'], get_mistral_pipe())
+                    return f"Analyse audio: {analysis}"
+                else:
+                    return "Erreur: Analyse impossible sans transcription"
+
+            elif task == "extract_info":
+                # Extraction d'informations
+                transcription = process_audio_for_translation(audio_path)
+                if transcription and transcription.get('text'):
+                    extraction = extract_audio_information(transcription['text'], get_mistral_pipe())
+                    return f"Informations extraites: {extraction}"
+                else:
+                    return "Erreur: Extraction impossible sans transcription"
+
+            else:
+                return f"Tâche audio non supportée: {task}"
+
+        except Exception as e:
+            return f"Erreur lors du traitement audio: {str(e)}"
+
+class LanguageProcessingTool(BaseTool):
+    """Outil LangChain pour le traitement du langage"""
+    name: str = "language_processor"
+    description: str = "Traite du texte pour classification, génération, traduction, et analyse sémantique. Utilise des modèles de transformers avancés."
+
+    def _run(self, input_data: str, run_manager: Optional[CallbackManagerForToolRun] = None) -> str:
+        """Exécute le traitement de langage"""
+        try:
+            # Parse input data - can be a simple text or JSON string
+            try:
+                params = json.loads(input_data)
+                text = params.get("text", input_data)
+                task = params.get("task", "analyze")
+                target_lang = params.get("target_lang", "fr")
+            except json.JSONDecodeError:
+                # If not JSON, treat as simple text
+                text = input_data
+                task = "analyze"
+                target_lang = "fr"
+
+            pipe = get_mistral_pipe()
+            if not pipe:
+                return "Erreur: Modèle de langage non disponible"
+
+            if task == "analyze":
+                prompt = f"Analyse ce texte et fournis un résumé, les thèmes principaux, et le sentiment général:\n\n{text}"
+                response = pipe(prompt, max_new_tokens=256, do_sample=True, temperature=0.3)[0]['generated_text']
+                return response.replace(prompt, "").strip()
+
+            elif task == "translate":
+                translation = translate_text_with_mistral(text, target_lang, pipe)
+                return f"Traduction ({target_lang}): {translation}"
+
+            elif task == "summarize":
+                prompt = f"Résume ce texte de manière concise et informative:\n\n{text}"
+                response = pipe(prompt, max_new_tokens=128, do_sample=True, temperature=0.3)[0]['generated_text']
+                return response.replace(prompt, "").strip()
+
+            elif task == "classify":
+                prompt = f"Classifie ce texte dans une catégorie appropriée et explique pourquoi:\n\n{text}"
+                response = pipe(prompt, max_new_tokens=128, do_sample=True, temperature=0.3)[0]['generated_text']
+                return response.replace(prompt, "").strip()
+
+            else:
+                return f"Tâche de langage non supportée: {task}"
+
+        except Exception as e:
+            return f"Erreur lors du traitement de langage: {str(e)}"
+
+class RoboticsTool(BaseTool):
+    """Outil LangChain pour les tâches robotiques"""
+    name: str = "robotics_processor"
+    description: str = "Contrôle et analyse robotique intégrant vision et action. Permet l'évaluation de tâches de manipulation et l'analyse de scènes robotiques."
+
+    def _run(self, input_data: str, run_manager: Optional[CallbackManagerForToolRun] = None) -> str:
+        """Exécute les tâches robotiques"""
+        try:
+            # Parse input data - can be a simple image path or JSON string
+            try:
+                params = json.loads(input_data)
+                image_path = params.get("image_path", input_data)
+                task = params.get("task", "analyze_scene")
+            except json.JSONDecodeError:
+                # If not JSON, treat as simple image path
+                image_path = input_data
+                task = "analyze_scene"
+
+            if not os.path.exists(image_path):
+                return f"Erreur: Image non trouvée: {image_path}"
+
+            # Charger les modèles robotiques disponibles
+            vision_model_path = os.path.join(MODEL_DIR, "vision_model/weights/best.pt")
+            lerobot_path = os.path.join(ROBOTICS_DIR, "lerobot/act_aloha_sim_transfer_cube_human")
+
+            if task == "analyze_scene":
+                # Analyse de scène pour robotique
+                if os.path.exists(vision_model_path):
+                    model = YOLO(vision_model_path)
+                    results = model(image_path)
+
+                    scene_analysis = "Analyse de scène robotique:\n"
+                    if results and len(results) > 0:
+                        detections = []
+                        for result in results:
+                            if result.boxes:
+                                for box in result.boxes:
+                                    conf = box.conf.item()
+                                    if conf > 0.5:  # Seuil de confiance
+                                        detections.append(f"Objet détectable (confiance: {conf:.2f})")
+
+                        scene_analysis += f"- Objets manipulables détectés: {len(detections)}\n"
+                        scene_analysis += "- Évaluation: Scène adaptée pour manipulation robotique\n"
+                        scene_analysis += "- Recommandation: Actions de préhension possibles"
+                    else:
+                        scene_analysis += "- Aucune objet détecté pour manipulation"
+
+                    return scene_analysis
+
+                else:
+                    return "Erreur: Modèle de vision robotique non disponible"
+
+            elif task == "predict_action":
+                # Prédiction d'action robotique
+                if os.path.exists(lerobot_path):
+                    try:
+                        policy = load_lerobot_model("lerobot/act_aloha_sim_transfer_cube_human")
+                        results = lerobot_test_vision_model(vision_model_path, policy, image_path)
+                        return f"Prédiction d'action robotique: {results}"
+                    except Exception as e:
+                        return f"Erreur modèle LeRobot: {str(e)}"
+                else:
+                    return "Erreur: Modèle robotique LeRobot non disponible"
+
+            else:
+                return f"Tâche robotique non supportée: {task}"
+
+        except Exception as e:
+            return f"Erreur lors du traitement robotique: {str(e)}"
+
+class PDFSearchTool(BaseTool):
+    """Outil LangChain pour la recherche et analyse de PDFs"""
+    name: str = "pdf_searcher"
+    description: str = "Recherche des PDFs académiques et scientifiques, les télécharge, et les analyse pour extraire des informations pertinentes."
+
+    def _run(self, input_data: str, run_manager: Optional[CallbackManagerForToolRun] = None) -> str:
+        """Exécute la recherche de PDFs"""
+        try:
+            # Parse input data - can be a simple query or JSON string
+            try:
+                params = json.loads(input_data)
+                query = params.get("query", input_data)
+                max_results = params.get("max_results", 3)
+            except json.JSONDecodeError:
+                # If not JSON, treat as simple query
+                query = input_data
+                max_results = 3
+
+            downloaded_pdfs = search_and_download_pdfs(query, max_results=max_results)
+
+            if downloaded_pdfs:
+                analysis = f"PDFs trouvés pour '{query}':\n\n"
+                for i, pdf in enumerate(downloaded_pdfs, 1):
+                    analysis += f"{i}. {pdf['title']}\n"
+                    analysis += f"   Source: {pdf['source']}\n"
+                    analysis += f"   Chemin: {pdf['path']}\n\n"
+
+                # Analyse avec Mistral
+                pipe = get_mistral_pipe()
+                if pipe:
+                    pdf_summary_prompt = f"""
+                    Voici une liste de PDFs téléchargés automatiquement pour la requête "{query}":
+
+                    {chr(10).join([f"- {pdf['title']} (Source: {pdf['source']})" for pdf in downloaded_pdfs])}
+
+                    Fournis un résumé utile de ces documents et explique comment ils pourraient être utiles pour des applications IA.
+                    """
+
+                    pdf_analysis = pipe(pdf_summary_prompt, max_new_tokens=512, do_sample=True, temperature=0.3)[0]['generated_text']
+                    analysis += f"Analyse Mistral:\n{pdf_analysis.replace(pdf_summary_prompt, '').strip()}"
+
+                return analysis
+            else:
+                return f"Aucun PDF trouvé pour la requête: {query}"
+
+        except Exception as e:
+            return f"Erreur lors de la recherche PDF: {str(e)}"
+
+# Créer l'agent LangChain avec Mistral
+@st.cache_resource
+def create_langchain_agent():
+    """Crée un agent LangChain utilisant Mistral comme LLM et nos outils spécialisés"""
+    try:
+        # Créer le LLM LangChain à partir du pipeline Mistral
+        pipe = get_mistral_pipe()
+        if not pipe:
+            return None
+
+        # Wrapper pour Mistral
+        class MistralLLM(LLM):
+            pipeline: Any = Field(default=None, description='Mistral pipeline')
+
+            def __init__(self, pipeline):
+                super().__init__()
+                self.pipeline = pipeline
+
+            def _call(self, prompt, stop=None):
+                try:
+                    result = self.pipeline(
+                        prompt,
+                        max_new_tokens=512,
+                        do_sample=True,
+                        temperature=0.7,
+                        top_p=0.95
+                    )[0]['generated_text']
+
+                    # Nettoyer la réponse
+                    if prompt in result:
+                        result = result.replace(prompt, "").strip()
+
+                    return result
+                except Exception as e:
+                    return f"Erreur génération: {str(e)}"
+
+            @property
+            def _llm_type(self):
+                return "mistral_pipeline"
+
+        llm = MistralLLM(pipe)
+
+        # Créer les outils
+        tools = [
+            VisionAnalysisTool(),
+            AudioProcessingTool(),
+            LanguageProcessingTool(),
+            RoboticsTool(),
+            PDFSearchTool()
+        ]
+
+        # Créer l'agent avec initialize_agent
+        agent = initialize_agent(
+            tools=tools,
+            llm=llm,
+            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=True,
+            handle_parsing_errors=True,
+            max_iterations=3
+        )
+
+        return agent
+
+    except Exception as e:
+        st.error(f"Erreur création agent LangChain: {e}")
+        return None
+
+# Instance globale de l'agent LangChain
+langchain_agent = create_langchain_agent()
+
 # ============ UTILITAIRES ============
 def log(msg):
     st.info(f"[{time.strftime('%H:%M:%S')}] {msg}")
@@ -644,55 +1058,6 @@ def search_video_rag(query, top_k=5):
 
     return [meta[i] for i in indices[0]]
 # ============ LLM AGENT (MISTRAL) ============
-@st.cache_resource
-def load_mistral_model():
-    """Charge le modèle Mistral 7B en 4-bit quantization"""
-    try:
-        model_path = os.path.join(LLM_DIR, "mistral-7b")
-
-        if not os.path.exists(model_path):
-            st.error("❌ Modèle Mistral non trouvé. Téléchargez-le d'abord.")
-            return None, None
-
-        # Configuration 4-bit quantization
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True
-        )
-
-        # Charger tokenizer et modèle
-        tokenizer = AutoTokenizer.from_pretrained(model_path, token=HF_TOKEN)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            quantization_config=bnb_config,
-            device_map="auto",
-            token=HF_TOKEN
-        )
-
-        # Créer pipeline
-        pipe = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            max_new_tokens=512,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.95,
-            repetition_penalty=1.15
-        )
-
-        return pipe, tokenizer
-    except Exception as e:
-        st.error(f"Erreur chargement Mistral: {str(e)}")
-        return None, None
-
 def download_mistral_model():
     """Télécharge Mistral 7B depuis HuggingFace"""
     try:
@@ -1303,7 +1668,9 @@ Analyse la tâche et décide:
 Réponse structurée:"""
 
         try:
-            response = self.brain(
+            # Utiliser seulement le pipe du tuple (pipe, tokenizer)
+            pipe = self.brain[0] if isinstance(self.brain, tuple) else self.brain
+            response = pipe(
                 prompt,
                 max_new_tokens=512,
                 do_sample=True,
@@ -1376,6 +1743,171 @@ def initialize_robot_system():
     intelligent_robot.load_brain()
 
     return intelligent_robot
+
+# ============ AUDIO TRANSLATION FUNCTIONS ============
+def process_audio_for_translation(audio_path):
+    """Traite un fichier audio pour transcription avec détection de langue"""
+    try:
+        # Utiliser Whisper pour une meilleure transcription
+        import whisper
+
+        # Charger le modèle Whisper (base pour performance)
+        model = whisper.load_model("base")
+
+        # Transcrire avec détection de langue
+        result = model.transcribe(audio_path)
+
+        return {
+            "text": result["text"].strip(),
+            "language": result.get("language", "unknown"),
+            "confidence": result.get("confidence", 0.0)
+        }
+
+    except ImportError:
+        # Fallback vers speech_recognition
+        try:
+            import speech_recognition as sr
+
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(audio_path) as source:
+                audio_data = recognizer.record(source)
+
+                # Essayer plusieurs langues
+                languages = ["fr-FR", "en-US", "es-ES", "de-DE", "it-IT", "pt-BR"]
+                for lang in languages:
+                    try:
+                        text = recognizer.recognize_google(audio_data, language=lang)
+                        return {
+                            "text": text,
+                            "language": lang.split('-')[0],
+                            "confidence": 0.8  # Estimation
+                        }
+                    except sr.UnknownValueError:
+                        continue
+
+                return None
+
+        except Exception as e:
+            st.error(f"Erreur transcription: {e}")
+            return None
+
+    except Exception as e:
+        st.error(f"Erreur traitement audio: {e}")
+        return None
+
+def translate_text_with_mistral(text, target_language, brain_model):
+    """Traduit du texte vers la langue cible en utilisant Mistral"""
+    if not brain_model or not text.strip():
+        return None
+
+    try:
+        # Utiliser seulement le pipe du tuple
+        pipe = brain_model[0] if isinstance(brain_model, tuple) else brain_model
+
+        lang_codes = {
+            "Anglais": "English",
+            "Français": "French",
+            "Espagnol": "Spanish",
+            "Allemand": "German",
+            "Italien": "Italian",
+            "Portugais": "Portuguese",
+            "Arabe": "Arabic",
+            "Chinois": "Chinese",
+            "Japonais": "Japanese"
+        }
+
+        target_lang_name = lang_codes.get(target_language, target_language)
+
+        prompt = f"""Translate the following text to {target_lang_name}. Provide only the translation without any additional comments or explanations:
+
+Text to translate:
+{text}
+
+Translation:"""
+
+        response = pipe(
+            prompt,
+            max_new_tokens=1024,
+            do_sample=True,
+            temperature=0.3,
+            top_p=0.9
+        )[0]['generated_text']
+
+        # Extraire seulement la traduction
+        translation = response.replace(prompt, "").strip()
+        return translation
+
+    except Exception as e:
+        st.error(f"Erreur traduction: {e}")
+        return None
+
+def analyze_audio_content(text, brain_model):
+    """Analyse le contenu d'un audio transcrit"""
+    if not brain_model or not text.strip():
+        return None
+
+    try:
+        pipe = brain_model[0] if isinstance(brain_model, tuple) else brain_model
+
+        prompt = f"""Analyze the following transcribed audio content and provide:
+1. Main topics discussed
+2. Key information or insights
+3. Overall sentiment
+4. Important entities mentioned (people, places, organizations)
+
+Audio transcription:
+{text}
+
+Analysis:"""
+
+        response = pipe(
+            prompt,
+            max_new_tokens=1024,
+            do_sample=True,
+            temperature=0.3,
+            top_p=0.9
+        )[0]['generated_text']
+
+        return response.replace(prompt, "").strip()
+
+    except Exception as e:
+        st.error(f"Erreur analyse: {e}")
+        return None
+
+def extract_audio_information(text, brain_model):
+    """Extrait les informations clés d'un audio transcrit"""
+    if not brain_model or not text.strip():
+        return None
+
+    try:
+        pipe = brain_model[0] if isinstance(brain_model, tuple) else brain_model
+
+        prompt = f"""Extract key information from the following audio transcription:
+- Dates and times mentioned
+- Names of people
+- Locations or addresses
+- Numbers, amounts, or quantities
+- Action items or tasks
+- Important decisions or conclusions
+
+Audio transcription:
+{text}
+
+Extracted information:"""
+
+        response = pipe(
+            prompt,
+            max_new_tokens=1024,
+            do_sample=True,
+            temperature=0.3,
+            top_p=0.9
+        )[0]['generated_text']
+
+        return response.replace(prompt, "").strip()
+
+    except Exception as e:
+        st.error(f"Erreur extraction: {e}")
+        return None
 
 # ============ ROBOT INTELLIGENT UI ============
 def robot_intelligent_interface():
@@ -1462,6 +1994,131 @@ def robot_intelligent_interface():
 
     # Interface de tâche intelligente
     st.subheader("🎯 Exécution de Tâches Intelligentes")
+
+    # Agent de traduction audio
+    st.markdown("### 🎵 Agent de Traduction Audio")
+    st.markdown("**Fonctionnalités :**")
+    st.markdown("- 🎤 Transcription automatique de l'audio")
+    st.markdown("- 🌍 Traduction en langues multiples")
+    st.markdown("- 📝 Résumé et analyse du contenu")
+    st.markdown("- 🎯 Extraction d'informations clés")
+
+    audio_task = st.selectbox(
+        "Type de tâche audio :",
+        ["Transcrire seulement", "Transcrire + Traduire", "Analyser contenu audio", "Extraire informations"]
+    )
+
+    audio_lang_target = None
+    if "Traduire" in audio_task:
+        audio_lang_target = st.selectbox(
+            "Langue cible :",
+            ["Anglais", "Français", "Espagnol", "Allemand", "Italien", "Portugais", "Arabe", "Chinois", "Japonais"]
+        )
+
+    uploaded_audio = st.file_uploader(
+        "📤 Uploader un fichier audio pour traduction :",
+        type=["wav", "mp3", "m4a", "flac"],
+        help="Formats supportés: WAV, MP3, M4A, FLAC"
+    )
+
+    if uploaded_audio and st.button("🎵 Traiter Audio", type="primary"):
+        with st.spinner("🎤 Traitement audio en cours..."):
+            # Sauvegarder temporairement
+            audio_path = os.path.join(BASE_DIR, f"translation_audio_{uploaded_audio.name}")
+            with open(audio_path, "wb") as f:
+                f.write(uploaded_audio.read())
+
+            # Transcription
+            transcription = process_audio_for_translation(audio_path)
+
+            if transcription:
+                st.success("✅ Transcription réussie!")
+
+                st.markdown("### 📝 Transcription:")
+                st.markdown(f"**Langue détectée:** {transcription.get('language', 'Inconnue')}")
+                st.markdown(f"**Texte:** {transcription['text']}")
+
+                # Traduction si demandée
+                if "Traduire" in audio_task and audio_lang_target:
+                    with st.spinner(f"🌍 Traduction vers {audio_lang_target}..."):
+                        translation = translate_text_with_mistral(
+                            transcription['text'],
+                            audio_lang_target,
+                            intelligent_robot.brain if intelligent_robot.brain else None
+                        )
+
+                        if translation:
+                            st.markdown(f"### 🌍 Traduction ({audio_lang_target}):")
+                            st.markdown(translation)
+
+                # Analyse du contenu si demandée
+                if "Analyser" in audio_task:
+                    with st.spinner("🧠 Analyse du contenu audio..."):
+                        analysis = analyze_audio_content(
+                            transcription['text'],
+                            intelligent_robot.brain if intelligent_robot.brain else None
+                        )
+
+                        if analysis:
+                            st.markdown("### 📊 Analyse du Contenu:")
+                            st.markdown(analysis)
+
+                # Extraction d'informations si demandée
+                if "Extraire" in audio_task:
+                    with st.spinner("🎯 Extraction d'informations..."):
+                        extraction = extract_audio_information(
+                            transcription['text'],
+                            intelligent_robot.brain if intelligent_robot.brain else None
+                        )
+
+                        if extraction:
+                            st.markdown("### 🎯 Informations Extraites:")
+                            st.markdown(extraction)
+
+                # Option de téléchargement
+                st.markdown("### 💾 Téléchargements:")
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.download_button(
+                        label="📄 Télécharger Transcription",
+                        data=transcription['text'],
+                        file_name="transcription.txt",
+                        mime="text/plain"
+                    )
+
+                if "Traduire" in audio_task and 'translation' in locals() and translation:
+                    with col2:
+                        st.download_button(
+                            label=f"🌍 Télécharger Traduction ({audio_lang_target})",
+                            data=translation,
+                            file_name=f"traduction_{audio_lang_target.lower()}.txt",
+                            mime="text/plain"
+                        )
+
+                with col3:
+                    full_report = f"""=== RAPPORT DE TRADUCTION AUDIO ===
+
+Transcription:
+{transcription['text']}
+
+{'Traduction (' + audio_lang_target + '):' + chr(10) + translation if 'translation' in locals() and translation else ''}
+
+{'Analyse:' + chr(10) + analysis if 'analysis' in locals() and analysis else ''}
+
+{'Informations extraites:' + chr(10) + extraction if 'extraction' in locals() and extraction else ''}
+"""
+                    st.download_button(
+                        label="📋 Télécharger Rapport Complet",
+                        data=full_report.strip(),
+                        file_name="rapport_traduction_audio.txt",
+                        mime="text/plain"
+                    )
+
+            else:
+                st.error("❌ Échec de la transcription audio")
+
+    st.markdown("---")
 
     task_input = st.text_area(
         "Décrivez la tâche à effectuer :",
@@ -1825,7 +2482,7 @@ with st.sidebar.expander("📚 Aide & Cas d'utilisation"):
     **Brancher :** `search_video_rag(query, top_k=5)`
     """)
 
-mode = st.sidebar.radio("Choisir le mode :", ["📥 Importation Données", "🧠 Entraînement IA", "🧪 Test du Modèle", "🤖 LLM Agent", "🤖 LeRobot Agent", "🦾 Robot Intelligent", "🚀 Serveur API Robot", "📤 Export Dataset/Modèles"])
+mode = st.sidebar.radio("Choisir le mode :", ["📥 Importation Données", "🧠 Entraînement IA", "🧪 Test du Modèle", "🤖 LLM Agent", "🤖 LeRobot Agent", "🦾 Robot Intelligent", "🎙️ Traducteur Robot Temps Réel", "🚀 Serveur API Robot", "📤 Export Dataset/Modèles", "🧠 Agent LangChain Multimodal"])
 preview_images = st.sidebar.checkbox("Prévisualisation images", value=False)
 if mode == "📥 Importation Données":
     st.header("📥 Importer PDF/Audio pour dataset multimodal")
@@ -2959,6 +3616,232 @@ elif mode == "🚀 Serveur API Robot":
             exists = os.path.exists(model_path) if not model_path.startswith("lerobot") and not model_path.endswith("yolov8n.pt") else True
             status = "✅ Disponible" if exists else "❌ Non trouvé"
             st.write(f"• **{model}**: {status}")
+
+elif mode == "🎙️ Traducteur Robot Temps Réel":
+    from realtime_translator import realtime_translator_mode
+    realtime_translator_mode()
+elif mode == "🧠 Agent LangChain Multimodal":
+    st.header("🧠 Agent LangChain Multimodal")
+
+    with st.expander("🔧 Architecture de l'Agent LangChain"):
+        st.markdown("""
+        ## 🤖 Agent LangChain Multimodal
+
+        ### 🧠 **LLM Central - Mistral 7B**
+        - Modèle de langage avancé pour le raisonnement
+        - Orchestration intelligente des outils
+        - Génération de réponses contextuelles
+
+        ### 🛠️ **Outils Spécialisés Disponibles**
+
+        #### 👁️ **Vision Analysis Tool**
+        - `vision_analyzer`: Détection d'objets, OCR, analyse de scènes
+        - Intégration YOLO pour la reconnaissance visuelle
+        - Support pour images complexes et annotations
+
+        #### 🎵 **Audio Processing Tool**
+        - `audio_processor`: Transcription multilingue avec Whisper
+        - Analyse de contenu audio et extraction d'informations
+        - Support pour WAV, MP3, M4A, FLAC
+
+        #### 🗣️ **Language Processing Tool**
+        - `language_processor`: Analyse, traduction, résumé de texte
+        - Support multilingue (9 langues) avec Mistral
+        - Classification et génération de contenu
+
+        #### 🦾 **Robotics Tool**
+        - `robotics_processor`: Analyse de scènes robotiques
+        - Prédiction d'actions avec LeRobot
+        - Évaluation de tâches de manipulation
+
+        #### 📚 **PDF Search Tool**
+        - `pdf_searcher`: Recherche de documents académiques
+        - Téléchargement automatique depuis sources ouvertes
+        - Analyse et résumé de contenu PDF
+
+        ### 🔄 **Workflow d'Exécution**
+        1. **Analyse de la requête** par Mistral
+        2. **Sélection automatique** des outils appropriés
+        3. **Orchestration séquentielle** des tâches
+        4. **Synthèse des résultats** en réponse cohérente
+
+        ### 💡 **Cas d'usage**
+        - **Analyse multimodale** : "Analyse cette image et décris ce que tu vois"
+        - **Traitement audio** : "Transcris ce fichier audio et résume le contenu"
+        - **Recherche intelligente** : "Trouve des PDFs sur l'IA et analyse leur contenu"
+        - **Tâches robotiques** : "Évalue si cette scène permet une manipulation robotique"
+        """)
+
+    # État de l'agent
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        agent_status = "✅ Actif" if langchain_agent else "❌ Inactif"
+        st.metric("🧠 Agent LangChain", agent_status)
+
+    with col2:
+        tools_count = 5  # Nombre d'outils définis
+        st.metric("🛠️ Outils Disponibles", tools_count)
+
+    with col3:
+        llm_status = "✅ Mistral-7B" if get_mistral_pipe() else "❌ Non chargé"
+        st.metric("🤖 LLM", llm_status)
+
+    # Interface de chat avec l'agent
+    st.subheader("💬 Conversation avec l'Agent Multimodal")
+
+    # Historique des messages
+    if "langchain_messages" not in st.session_state:
+        st.session_state.langchain_messages = []
+
+    # Afficher l'historique
+    for message in st.session_state.langchain_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Input utilisateur
+    if prompt := st.chat_input("Posez votre question à l'agent multimodal..."):
+        # Ajouter le message utilisateur
+        st.session_state.langchain_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Réponse de l'agent
+        with st.chat_message("assistant"):
+            if langchain_agent:
+                with st.spinner("🤖 Agent LangChain réfléchit et utilise ses outils..."):
+                    try:
+                        # Exécuter l'agent avec la requête
+                        response = langchain_agent.invoke({"input": prompt})
+
+                        # Extraire la réponse finale
+                        final_answer = response.get("output", "Aucune réponse générée")
+
+                        st.markdown(final_answer)
+
+                        # Ajouter à l'historique
+                        st.session_state.langchain_messages.append({"role": "assistant", "content": final_answer})
+
+                        # Afficher les étapes intermédiaires si disponibles
+                        if "intermediate_steps" in response:
+                            with st.expander("🔍 Détails de l'exécution"):
+                                for step in response["intermediate_steps"]:
+                                    tool_name = step[0].tool
+                                    tool_input = step[0].tool_input
+                                    tool_output = step[1]
+
+                                    st.markdown(f"**🛠️ Outil utilisé:** {tool_name}")
+                                    st.markdown(f"**📥 Input:** {tool_input}")
+                                    st.markdown(f"**📤 Output:** {tool_output}")
+                                    st.markdown("---")
+
+                    except Exception as e:
+                        error_msg = f"Erreur lors de l'exécution de l'agent: {str(e)}"
+                        st.error(error_msg)
+                        st.session_state.langchain_messages.append({"role": "assistant", "content": error_msg})
+            else:
+                error_msg = "❌ Agent LangChain non disponible. Vérifiez que Mistral est chargé."
+                st.error(error_msg)
+                st.session_state.langchain_messages.append({"role": "assistant", "content": error_msg})
+
+    # Upload de fichiers pour analyse
+    st.subheader("📎 Analyse de fichiers")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        uploaded_image = st.file_uploader(
+            "📸 Image à analyser :",
+            type=["png", "jpg", "jpeg"],
+            help="L'agent pourra analyser cette image automatiquement"
+        )
+
+        if uploaded_image:
+            # Sauvegarder temporairement
+            image_path = os.path.join(BASE_DIR, f"langchain_image_{uploaded_image.name}")
+            with open(image_path, "wb") as f:
+                f.write(uploaded_image.read())
+
+            st.image(image_path, caption="Image chargée", width=200)
+            st.success("✅ Image prête pour analyse")
+
+    with col2:
+        uploaded_audio = st.file_uploader(
+            "🎵 Audio à analyser :",
+            type=["wav", "mp3", "m4a", "flac"],
+            help="L'agent pourra transcrire et analyser cet audio"
+        )
+
+        if uploaded_audio:
+            # Sauvegarder temporairement
+            audio_path = os.path.join(BASE_DIR, f"langchain_audio_{uploaded_audio.name}")
+            with open(audio_path, "wb") as f:
+                f.write(uploaded_audio.read())
+
+            st.audio(audio_path, format=f"audio/{uploaded_audio.name.split('.')[-1]}")
+            st.success("✅ Audio prêt pour analyse")
+
+    # Boutons d'analyse rapide
+    if uploaded_image or uploaded_audio:
+        st.subheader("⚡ Analyse rapide")
+
+        col1, col2, col3 = st.columns(3)
+
+        if uploaded_image and st.button("🔍 Analyser l'image", type="secondary"):
+            image_path = os.path.join(BASE_DIR, f"langchain_image_{uploaded_image.name}")
+            with st.spinner("Analyse de l'image en cours..."):
+                vision_tool = VisionAnalysisTool()
+                result = vision_tool._run(image_path)
+                st.success("Analyse terminée!")
+                st.markdown(result)
+
+        if uploaded_audio and st.button("🎤 Transcrire l'audio", type="secondary"):
+            audio_path = os.path.join(BASE_DIR, f"langchain_audio_{uploaded_audio.name}")
+            with st.spinner("Transcription audio en cours..."):
+                audio_tool = AudioProcessingTool()
+                result = audio_tool._run(audio_path, task="transcribe")
+                st.success("Transcription terminée!")
+                st.markdown(result)
+
+        if uploaded_audio and st.button("📊 Analyser l'audio", type="secondary"):
+            audio_path = os.path.join(BASE_DIR, f"langchain_audio_{uploaded_audio.name}")
+            with st.spinner("Analyse audio en cours..."):
+                audio_tool = AudioProcessingTool()
+                result = audio_tool._run(audio_path, task="analyze")
+                st.success("Analyse terminée!")
+                st.markdown(result)
+
+    # Exemples de prompts
+    with st.expander("💡 Exemples de prompts"):
+        st.markdown("""
+        ### 📸 **Analyse d'images**
+        - "Analyse cette image et décris tous les objets que tu vois"
+        - "Y a-t-il du texte dans cette image ? Si oui, extrais-le"
+        - "Cette image convient-elle pour une manipulation robotique ?"
+
+        ### 🎵 **Traitement audio**
+        - "Transcris ce fichier audio en français"
+        - "Quel est le sujet principal de cet enregistrement audio ?"
+        - "Extrait toutes les informations importantes de cet audio"
+
+        ### 🗣️ **Traitement texte**
+        - "Traduis ce texte en espagnol"
+        - "Résume ce contenu en 3 phrases"
+        - "Classe ce texte dans une catégorie appropriée"
+
+        ### 🤖 **Tâches robotiques**
+        - "Évalue cette scène pour une tâche de manipulation"
+        - "Quelles actions robotiques sont possibles ici ?"
+
+        ### 📚 **Recherche PDF**
+        - "Trouve des PDFs sur l'intelligence artificielle"
+        - "Recherche des articles sur la vision par ordinateur"
+        """)
+
+    # Bouton de réinitialisation
+    if st.button("🔄 Réinitialiser la conversation"):
+        st.session_state.langchain_messages = []
+        st.rerun()
 
 elif mode == "📤 Export Dataset/Modèles":
 
