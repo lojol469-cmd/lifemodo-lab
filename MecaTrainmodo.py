@@ -1,3 +1,7 @@
+# Copyright (c) 2025 Belikan. All rights reserved.
+# Licensed under the LifeModo AI Lab License. See LICENSE file for details.
+# Contact: belikan@lifemodo.ai
+
 # ✅ Installer les dépendances YOLOv11
 !pip install -U ultralytics easyocr ray[tune] albumentations --quiet
 

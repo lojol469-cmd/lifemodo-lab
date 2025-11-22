@@ -2,6 +2,14 @@
 # 🧬 LifeModo AI Lab v2.0 – Streamlit All-in-One Multimodal
 # Extraction PDF + OCR + Dataset Multimodal (Vision/Language/Audio) + Training + Test + Export
 # ============================================================
+# Copyright (c) 2025 Belikan. All rights reserved.
+# Licensed under the LifeModo AI Lab License. See LICENSE file for details.
+# Contact: belikan@lifemodo.ai
+# ============================================================
+
+# === AJOUTE ÇA EN TOUT HAUT ===
+from utils.rag_ultimate import ask_gabon, build_or_load_index
+
 import streamlit as st
 import fitz, pytesseract, cv2, io, os, json, gc, shutil, time, zipfile
 from PIL import Image
@@ -150,6 +158,13 @@ else:
     status = {"processed_pdfs": []}
     with open(STATUS_FILE, "w") as f:
         json.dump(status, f)
+
+# Build RAG index on startup
+try:
+    rag_index, rag_meta = build_or_load_index()
+    st.sidebar.success("✅ RAG Index chargé!")
+except Exception as e:
+    st.sidebar.warning(f"⚠️ RAG non disponible: {str(e)}")
 
 # Vérification GPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -4501,6 +4516,67 @@ elif mode == "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025":
         st.metric("Captions générées par Mistral", f"{caption_count}", "qualité pro")
     with col3:
         st.video("https://www.youtube.com/embed/dQw4w9WgXcQ")  # Placeholder video
+
+    st.markdown("---")
+    st.subheader("🧠 Chat RAG – Dieu de la Mécanique 2025")
+
+    # Interface de chat RAG pour questions mécaniques/robotiques
+    if "gabon_chat_messages" not in st.session_state:
+        st.session_state.gabon_chat_messages = []
+
+    # Afficher l'historique
+    for message in st.session_state.gabon_chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Input utilisateur
+    if prompt := st.chat_input("Posez votre question sur la mécanique, robotique, ou aérodynamique..."):
+        # Ajouter le message utilisateur
+        st.session_state.gabon_chat_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Réponse RAG
+        with st.chat_message("assistant"):
+            with st.spinner("🤖 Le Dieu de la Mécanique réfléchit..."):
+                try:
+                    from utils.rag_ultimate import ask_gabon
+                    response = ask_gabon(prompt)
+                    st.markdown(response)
+                    st.session_state.gabon_chat_messages.append({"role": "assistant", "content": response})
+                except Exception as e:
+                    error_msg = f"Erreur RAG: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.gabon_chat_messages.append({"role": "assistant", "content": error_msg})
+
+    # Exemples de prompts RAG
+    with st.expander("💡 Exemples de questions mécaniques"):
+        st.markdown("""
+        ### 🔧 **Questions sur les moteurs**
+        - "Comment fonctionne un système de suspension active ?"
+        - "Quelles sont les différences entre un moteur thermique et électrique ?"
+        - "Comment calculer le couple d'un moteur ?"
+
+        ### 🤖 **Questions robotiques**
+        - "Comment programmer un bras robotique pour l'assemblage ?"
+        - "Quels capteurs utiliser pour la navigation autonome ?"
+        - "Comment implémenter un contrôleur PID ?"
+
+        ### 🏎️ **Questions aérodynamiques**
+        - "Comment fonctionne un diffuseur arrière de F1 ?"
+        - "Qu'est-ce que le downforce et comment l'optimiser ?"
+        - "Comment réduire la traînée aérodynamique ?"
+
+        ### ⚙️ **Questions générales**
+        - "Quels matériaux utiliser pour une pièce mécanique résistante ?"
+        - "Comment dimensionner un engrenage ?"
+        - "Quelles normes de sécurité appliquer en robotique ?"
+        """)
+
+    # Bouton de réinitialisation
+    if st.button("🔄 Réinitialiser la conversation RAG"):
+        st.session_state.gabon_chat_messages = []
+        st.rerun()
 
     st.markdown("---")
     st.subheader("🇬🇦 Fonctions exclusives Gabon 2025 (personne d'autre n'a ça)")

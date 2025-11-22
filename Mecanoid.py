@@ -1,3 +1,7 @@
+# Copyright (c) 2025 Belikan. All rights reserved.
+# Licensed under the LifeModo AI Lab License. See LICENSE file for details.
+# Contact: belikan@lifemodo.ai
+
 import streamlit as st
 import os
 from ultralytics import YOLO, SAM

@@ -1,3 +1,7 @@
+# Copyright (c) 2025 Belikan. All rights reserved.
+# Licensed under the LifeModo AI Lab License. See LICENSE file for details.
+# Contact: belikan@lifemodo.ai
+
 """
 Module pour le traducteur robot temps réel
 """
