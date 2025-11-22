@@ -4,7 +4,15 @@ import os
 import json
 import numpy as np
 import faiss
-from rank_bm25 import BM25Okapi
+
+# Import conditionnel pour rank_bm25
+try:
+    from rank_bm25 import BM25Okapi
+    BM25_AVAILABLE = True
+except ImportError:
+    BM25_AVAILABLE = False
+    print("⚠️ rank_bm25 non disponible - BM25 sera désactivé")
+
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline
 import torch
@@ -15,7 +23,8 @@ CHUNK_DIR = os.path.join(BASE_DIR, "rag_ultimate")
 os.makedirs(CHUNK_DIR, exist_ok=True)
 
 # ================== MODÈLES (rien de lourd à télécharger sauf e5 déjà fait)
-embedder = SentenceTransformer("intfloat/multilingual-e5-large-instruct", device="auto")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+embedder = SentenceTransformer("intfloat/multilingual-e5-large-instruct", device=device)
 reranker = None  # Chargé à la demande pour économiser la VRAM
 
 # Variables globales
@@ -37,7 +46,11 @@ def build_or_load_index():
         meta = json.load(open(meta_path, encoding="utf-8"))
         chunks = meta["chunks"]
         sources = meta["sources"]
-        bm25 = BM25Okapi([c.lower().split() for c in chunks])
+        if BM25_AVAILABLE:
+            bm25 = BM25Okapi([c.lower().split() for c in chunks])
+        else:
+            bm25 = None
+            print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
         print(f"RAG chargé → {len(chunks)} chunks prêts")
     else:
         print("Première construction du RAG ULTIME...")
@@ -74,7 +87,11 @@ def _build_index_from_dataset():
     index.add(embeddings.astype(np.float32))
 
     # BM25
-    bm25 = BM25Okapi([c.lower().split() for c in chunks])
+    if BM25_AVAILABLE:
+        bm25 = BM25Okapi([c.lower().split() for c in chunks])
+    else:
+        bm25 = None
+        print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
 
     # Sauvegarde
     faiss.write_index(index, os.path.join(CHUNK_DIR, "faiss.index"))
@@ -89,9 +106,12 @@ def hybrid_search(query, k=40):
     q_emb = embedder.encode([query], normalize_embeddings=True).astype(np.float32)
     D, I = index.search(q_emb, k*2)
 
-    q_tokens = query.lower().split()
-    bm25_scores = np.array(bm25.get_scores(q_tokens))
-    bm25_top = np.argsort(bm25_scores)[-k*2:][::-1]
+    # Recherche BM25 si disponible
+    bm25_top = []
+    if BM25_AVAILABLE and bm25 is not None:
+        q_tokens = query.lower().split()
+        bm25_scores = np.array(bm25.get_scores(q_tokens))
+        bm25_top = np.argsort(bm25_scores)[-k*2:][::-1]
 
     # Fusion RRF (Reciprocal Rank Fusion)
     score = np.zeros(len(chunks))
