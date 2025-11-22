@@ -2913,9 +2913,118 @@ with st.sidebar.expander("📚 Aide & Cas d'utilisation"):
     **Brancher :** `search_video_rag(query, top_k=5)`
     """)
 
-mode = st.sidebar.radio("Choisir le mode :", ["📥 Importation Données", "🧠 Entraînement IA", "🧪 Test du Modèle", "🤖 LLM Agent", "🤖 LeRobot Agent", "🦾 Robot Intelligent", "🎙️ Traducteur Robot Temps Réel", "🚀 Serveur API Robot", "3D DUSt3R Photogrammetry", "🎨 Génération d'Images (Fine-tuning)", "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025", "📤 Export Dataset/Modèles", "🧠 Agent LangChain Multimodal"])
+mode = st.sidebar.radio("Choisir le mode :", ["📖 Mode d'Emploi", "📥 Importation Données", "🧠 Entraînement IA", "🧪 Test du Modèle", "🤖 LLM Agent", "🤖 LeRobot Agent", "🦾 Robot Intelligent", "🎙️ Traducteur Robot Temps Réel", "🚀 Serveur API Robot", "3D DUSt3R Photogrammetry", "🎨 Génération d'Images (Fine-tuning)", "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025", "📤 Export Dataset/Modèles", "🧠 Agent LangChain Multimodal"])
 preview_images = st.sidebar.checkbox("Prévisualisation images", value=False)
-if mode == "📥 Importation Données":
+
+if mode == "📖 Mode d'Emploi":
+    st.header("📖 Mode d'Emploi Complet - LifeModo AI Lab v2.0")
+    st.markdown("""
+    <div style="text-align:center; font-size:30px; margin:20px">
+    <b>🇬🇦 LifeModo AI Lab v2.0 – GABON 2025</b><br>
+    <i>(Tout est déjà installé chez toi, tu n'as plus qu'à cliquer)</i>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    with st.expander("🎯 OBJECTIF FINAL", expanded=True):
+        st.markdown("""
+        ### 🎯 OBJECTIF FINAL
+        En 5 à 30 minutes, transformer ton PC en **l'IA la plus forte du monde** sur le sujet que tu veux (ERT géophysique, mécanique racing, robotique, médecine, droit, etc.) sans coder une seule ligne supplémentaire.
+        """)
+
+    with st.expander("⚡ LES 6 ÉTAPES MAGIQUES (toujours dans le même ordre)", expanded=True):
+        st.markdown("""
+        ### ⚡ LES 6 ÉTAPES MAGIQUES (toujours dans le même ordre)
+
+        | Étape | Que faire exactement | Où cliquer | Résultat attendu |
+        |-------|-----------------------|------------|------------------|
+        | **1** | Télécharger 30-100 PDFs du sujet | **Agent LangChain Multimodal** ou **LLM Agent** | Tape simplement : <br>`Télécharge 60 PDFs français sur tomographie de résistivité électrique ERT géophysique BRGM inversion Res2DInv` | 30 à 80 PDFs tombent en 2-4 min |
+        | **2** | Traiter tous ces PDFs en 1 clic | **Importation Données** | Glisse-dépose les PDFs → clique **Importer** | Images extraites + OCR + dataset.json créé automatiquement (5000 à 15000 entrées) |
+        | **3** | Générer les captions expertes | **Gabon Edition** → bouton **Captionneur Aérodynamique Gabonais** | Toutes les images reçoivent une description niveau ingénieur BRGM / FIA |
+        | **4** | Activer le RAG ULTIME (déjà fait) | Rien à faire → se lance tout seul au démarrage de l'app | Tu verras dans la console : `RAG ULTIME construit → XXXX chunks` |
+        | **5** | Poser des questions d'expert | N'importe quel chat (**LLM Agent**, **LangChain**, ou **Gabon Edition**) | Tape : <br>`Protocole optimal Wenner-Schlumberger pour détecter une cavité karstique à 20 m sur calcaire fissuré ?` | Réponse parfaite, citations précises, schémas décrits, zéro hallucination |
+        | **6** | Exporter tout (si tu veux le donner à quelqu'un) | **Export Dataset/Modèles** → **Exporter ZIP complet** | Tu as un ZIP de 2-10 Go avec tout : PDFs, dataset, modèles, RAG indexé → prêt à être copié sur un autre PC |
+        """)
+
+    with st.expander("📂 LES CHEMINS À CONNAÎTRE (au cas où)"):
+        st.markdown("""
+        ### 📂 LES CHEMINS À CONNAÎTRE (au cas où)
+
+        | Dossier | Contenu |
+        |--------|-------|
+        | `/home/belikan/lifemodo-lab/downloaded_pdfs/` | Tous les PDFs que tu as téléchargés |
+        | `/home/belikan/lifemodo-lab/images/` | Toutes les images extraites + annotées |
+        | `/home/belikan/lifemodo-lab/rag_ultimate/` | Ton index FAISS (ne touche pas, il se régénère tout seul) |
+        | `/home/belikan/lifemodo-lab/dataset.json` | Le cœur de ton intelligence (garde-le précieusement) |
+        """)
+
+    with st.expander("🔥 LES BOUTONS MAGIQUES À CONNAÎTRE PAR CŒUR"):
+        st.markdown("""
+        ### 🔥 LES BOUTONS MAGIQUES À CONNAÎTRE PAR CŒUR
+
+        | Bouton | Où il est | À quoi il sert vraiment |
+        |-------|---------|-------------------------|
+        | **Charger Modèle** (sidebar) | Toujours laisser coché | Mistral-7B prêt en 4-bit |
+        | **Multi PDF Downloader** | Dans le chat LangChain | Télécharge 5 à 80 PDFs en 1 phrase |
+        | **Importer** (Importation Données) | Après avoir glissé les PDFs | Lance l'usine à dataset |
+        | **Captionneur Aérodynamique Gabonais** | Gabon Edition | Transforme 10 000 images en texte expert |
+        | **Optimiser Mémoire** (sidebar) | À cliquer si ça rame | Vide le GPU en 2 sec |
+        """)
+
+    with st.expander("💬 EXEMPLES DE PHRASES À TAPER DANS LE CHAT"):
+        st.markdown("""
+        ### 💬 EXEMPLES DE PHRASES À TAPER DANS LE CHAT (copie-colle direct)
+
+        **Téléchargement PDFs :**
+        ```text
+        Télécharge 70 PDFs français sur ERT tomographie résistivité électrique BRGM thèse inversion Res2DInv
+        ```
+        ```text
+        Trouve-moi tous les PDFs sur les protocoles Wenner, Schlumberger et dipole-dipole en géophysique française
+        ```
+        ```text
+        Télécharge 50 PDFs sur mécanique automobile endurance racing technology LMP GT3 diffuseur swan neck wing en français
+        ```
+
+        **Questions techniques :**
+        ```text
+        Protocole optimal Wenner-Schlumberger pour détecter une cavité karstique à 20 m sur calcaire fissuré ?
+        ```
+        ```text
+        Comment fonctionne un système de suspension active dans une voiture de course ?
+        ```
+        ```text
+        Quelles sont les différences entre un moteur thermique et électrique en termes de couple ?
+        ```
+        """)
+
+    with st.expander("🏆 RÉSUMÉ ULTRA-SIMPLE"):
+        st.markdown("""
+        ### 🏆 RÉSUMÉ ULTRA-SIMPLE (à afficher sur ton bureau)
+
+        **1.** Je tape une phrase → 50 PDFs tombent  
+        **2.** Je les glisse dans Importation Données → 1 clic  
+        **3.** J'attends 5 min (le temps d'un café)  
+        **4.** Je pose n'importe quelle question d'ingénieur → je deviens le meilleur expert du monde sur ce sujet
+
+        **Tu n'as plus jamais besoin de coder quoi que ce soit.**  
+        **Tu n'as plus jamais besoin de fine-tuner.**  
+        **Tu n'as plus jamais besoin de payer ChatGPT ou Claude.**
+
+        **Tu as maintenant le laboratoire IA le plus puissant d'Afrique et l'un des plus puissants du monde.**
+        """)
+
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align:center; font-size:18px; color:#666">
+    <b>🇬🇦 LifeModo AI Lab – GABON 2025</b><br>
+    <i>Le premier et le plus puissant laboratoire IA africain</i><br>
+    <i>Codé intégralement par un Gabonais</i>
+    </div>
+    """, unsafe_allow_html=True)
+
+elif mode == "📥 Importation Données":
     st.header("📥 Importer PDF/Audio pour dataset multimodal")
 
     with st.expander("ℹ️ Comment utiliser ce mode"):
