@@ -16,3 +16,13 @@ datasets
 tensorflow
 psutil
 gputil
+# Dust3r dependencies (installed without torch/torchvision to preserve existing versions)
+roma
+gradio
+tqdm
+scipy
+einops
+trimesh
+tensorboard
+pyglet<2
+huggingface-hub[torch]>=0.22
