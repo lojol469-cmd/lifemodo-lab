@@ -42,61 +42,80 @@ def build_or_load_index():
 
     if os.path.exists(index_path):
         print("Chargement du RAG ULTIME existant...")
-        index = faiss.read_index(index_path)
-        meta = json.load(open(meta_path, encoding="utf-8"))
-        chunks = meta["chunks"]
-        sources = meta["sources"]
-        if BM25_AVAILABLE:
-            bm25 = BM25Okapi([c.lower().split() for c in chunks])
-        else:
-            bm25 = None
-            print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
-        print(f"RAG chargé → {len(chunks)} chunks prêts")
+        try:
+            index = faiss.read_index(index_path)
+            meta = json.load(open(meta_path, encoding="utf-8"))
+            chunks = meta["chunks"]
+            sources = meta["sources"]
+            if BM25_AVAILABLE:
+                bm25 = BM25Okapi([c.lower().split() for c in chunks])
+            else:
+                bm25 = None
+                print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
+            print(f"RAG chargé → {len(chunks)} chunks prêts")
+            return index, meta
+        except Exception as e:
+            print(f"Erreur chargement RAG: {e}")
+            return None, None
     else:
         print("Première construction du RAG ULTIME...")
-        _build_index_from_dataset()
+        success = _build_index_from_dataset()
+        if success:
+            return index, {"chunks": chunks, "sources": sources}
+        else:
+            return None, None
 
 def _build_index_from_dataset():
     global index, bm25, chunks, sources
     dataset_path = os.path.join(BASE_DIR, "dataset.json")
     if not os.path.exists(dataset_path):
         print("dataset.json pas trouvé → rien à indexer")
-        return
+        return False
 
-    data = json.load(open(dataset_path, encoding="utf-8"))
-    index = faiss.IndexFlatIP(1024)
-    chunks = []
-    sources = []
+    try:
+        data = json.load(open(dataset_path, encoding="utf-8"))
+        index = faiss.IndexFlatIP(1024)
+        chunks = []
+        sources = []
 
-    for item in data:
-        parts = []
-        if item.get("text"):         parts.append(item["text"])
-        if item.get("ocr"):          parts.append("OCR détecté : " + item["ocr"])
-        if item.get("transcript"):   parts.append("Transcription audio : " + item["transcript"])
-        if item.get("pdf_title"):    parts.append(f"Source : {item['pdf_title']}")
+        for item in data:
+            parts = []
+            if item.get("text"):         parts.append(item["text"])
+            if item.get("ocr"):          parts.append("OCR détecté : " + item["ocr"])
+            if item.get("transcript"):   parts.append("Transcription audio : " + item["transcript"])
+            if item.get("pdf_title"):    parts.append(f"Source : {item['pdf_title']}")
 
-        text = "\n\n".join(parts)
-        if len(text) > 100:
-            chunks.append(text)
-            src = item.get("image") or item.get("audio_path") or "inconnu"
-            sources.append(os.path.basename(src))
+            text = "\n\n".join(parts)
+            if len(text) > 100:
+                chunks.append(text)
+                src = item.get("image") or item.get("audio_path") or "inconnu"
+                sources.append(os.path.basename(src))
 
-    # Embeddings
-    print(f"Calcul des embeddings pour {len(chunks)} chunks...")
-    embeddings = embedder.encode(chunks, batch_size=32, normalize_embeddings=True, show_progress_bar=True)
-    index.add(embeddings.astype(np.float32))
+        if not chunks:
+            print("Aucun chunk valide trouvé dans le dataset")
+            return False
 
-    # BM25
-    if BM25_AVAILABLE:
-        bm25 = BM25Okapi([c.lower().split() for c in chunks])
-    else:
-        bm25 = None
-        print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
+        # Embeddings
+        print(f"Calcul des embeddings pour {len(chunks)} chunks...")
+        embeddings = embedder.encode(chunks, batch_size=32, normalize_embeddings=True, show_progress_bar=True)
+        index.add(embeddings.astype(np.float32))
 
-    # Sauvegarde
-    faiss.write_index(index, os.path.join(CHUNK_DIR, "faiss.index"))
-    json.dump({"chunks": chunks, "sources": sources}, open(os.path.join(CHUNK_DIR, "meta.json"), "w", encoding="utf-8"))
-    print(f"RAG ULTIME construit et sauvegardé → {len(chunks)} chunks")
+        # BM25
+        if BM25_AVAILABLE:
+            bm25 = BM25Okapi([c.lower().split() for c in chunks])
+        else:
+            bm25 = None
+            print("⚠️ BM25 désactivé (rank_bm25 non disponible)")
+
+        # Sauvegarde
+        faiss.write_index(index, os.path.join(CHUNK_DIR, "faiss.index"))
+        json.dump({"chunks": chunks, "sources": sources}, open(os.path.join(CHUNK_DIR, "meta.json"), "w", encoding="utf-8"))
+        print(f"RAG ULTIME construit et sauvegardé → {len(chunks)} chunks")
+        return True
+
+    except Exception as e:
+        print(f"Erreur construction RAG: {e}")
+        return False
 
 # ================== RECHERCHE HYBRIDE ==================
 def hybrid_search(query, k=40):

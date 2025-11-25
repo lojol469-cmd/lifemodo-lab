@@ -32,7 +32,7 @@ import psutil # For CPU monitoring
 import GPUtil # For GPU monitoring
 import faiss
 import torchvision.transforms as T
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 from transformers import AutoProcessor, AutoModel
 import dotenv
 import torch
@@ -109,6 +109,12 @@ import base64
 from io import BytesIO
 from pydantic import Field
 
+# Additional imports for audio analysis
+import librosa
+import librosa.display
+import tempfile
+from datasets import load_dataset
+
 # Charger les variables d'environnement
 dotenv.load_dotenv()
 HF_TOKEN = os.getenv('HF_TOKEN')
@@ -160,11 +166,13 @@ else:
         json.dump(status, f)
 
 # Build RAG index on startup
-try:
-    rag_index, rag_meta = build_or_load_index()
+rag_result = build_or_load_index()
+if rag_result and rag_result[0] is not None:
+    rag_index, rag_meta = rag_result
     st.sidebar.success("✅ RAG Index chargé!")
-except Exception as e:
-    st.sidebar.warning(f"⚠️ RAG non disponible: {str(e)}")
+else:
+    rag_index, rag_meta = None, None
+    st.sidebar.warning("⚠️ RAG non disponible - Aucun dataset trouvé ou erreur de chargement")
 
 # Vérification GPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -248,12 +256,12 @@ def get_optimal_device_map():
     else:
         return "cpu"
 
-def load_mistral_model_optimized():
+def load_phi_model_optimized():
     """Version 100 % stable – utilise le cache existant sans retélécharger"""
     try:
-        model_id = "mistralai/Mistral-7B-Instruct-v0.2"   # Garde v0.2 qui est déjà dans le cache
+        model_id = "microsoft/phi-2"   # Phi-2 est plus rapide que Mistral
 
-        # Quantization 4-bit ultra-légère (3.8 GB VRAM)
+        # Quantization 4-bit ultra-légère (2.5 GB VRAM pour Phi-2 vs 3.8 GB pour Mistral)
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
@@ -298,8 +306,8 @@ def load_mistral_model_optimized():
         except:
             return None, None
 
-def unload_mistral_model():
-    """Décharge le modèle Mistral pour libérer la mémoire"""
+def unload_phi_model():
+    """Décharge le modèle Phi pour libérer la mémoire"""
     try:
         # Nettoyer la mémoire GPU
         if torch.cuda.is_available():
@@ -310,31 +318,31 @@ def unload_mistral_model():
         import gc
         gc.collect()
 
-        st.success("✅ Modèle Mistral déchargé et mémoire libérée!")
+        st.success("✅ Modèle Phi déchargé et mémoire libérée!")
         return True
     except Exception as e:
         st.error(f"Erreur déchargement modèle: {str(e)}")
         return False
 
-def get_mistral_pipe_lazy():
-    """Obtient le pipeline Mistral avec chargement lazy (seulement si nécessaire)"""
+def get_phi_pipe_lazy():
+    """Obtient le pipeline Phi avec chargement lazy (seulement si nécessaire)"""
     # Utiliser directement le cache Streamlit - pas besoin de variables globales
-    return load_mistral_model_cached()
+    return load_phi_model_cached()
 
-# Chargement global du modèle Mistral avec cache Streamlit
+# Chargement global du modèle Phi avec cache Streamlit
 @st.cache_resource
-def load_mistral_model_cached():
-    """Charge le modèle Mistral avec cache Streamlit pour éviter les rechargements"""
-    return load_mistral_model_optimized()
+def load_phi_model_cached():
+    """Charge le modèle Phi avec cache Streamlit pour éviter les rechargements"""
+    return load_phi_model_optimized()
 
 # ============ CONTRÔLES DE GESTION MÉMOIRE ============
 st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 Gestion Modèle Mistral")
+st.sidebar.subheader("🧠 Gestion Modèle Phi")
 
 # État du modèle
 try:
     # Tester si le modèle est dans le cache
-    cached_model = load_mistral_model_cached()
+    cached_model = load_phi_model_cached()
     model_loaded = cached_model is not None and len(cached_model) == 2
 except:
     model_loaded = False
@@ -358,8 +366,8 @@ else:
 col1, col2 = st.sidebar.columns(2)
 with col1:
     if st.button("🔄 Charger Modèle", type="primary", disabled=model_loaded):
-        with st.spinner("Chargement du modèle Mistral optimisé..."):
-            cached_result = load_mistral_model_cached()
+        with st.spinner("Chargement du modèle Phi optimisé..."):
+            cached_result = load_phi_model_cached()
             if cached_result:
                 st.sidebar.success("✅ Modèle chargé!")
                 st.rerun()
@@ -367,7 +375,7 @@ with col1:
 with col2:
     if st.button("🗑️ Décharger Modèle", disabled=not model_loaded):
         # Clear the cache to unload the model
-        load_mistral_model_cached.clear()
+        load_phi_model_cached.clear()
         # Force garbage collection
         import gc
         gc.collect()
@@ -464,7 +472,7 @@ class AudioProcessingTool(BaseTool):
                 # Analyse de contenu
                 transcription = process_audio_for_translation(audio_path)
                 if transcription and transcription.get('text'):
-                    analysis = analyze_audio_content(transcription['text'], get_mistral_pipe_lazy()[0])
+                    analysis = analyze_audio_content(transcription['text'], get_phi_pipe_lazy()[0])
                     return f"Analyse audio: {analysis}"
                 else:
                     return "Erreur: Analyse impossible sans transcription"
@@ -473,7 +481,7 @@ class AudioProcessingTool(BaseTool):
                 # Extraction d'informations
                 transcription = process_audio_for_translation(audio_path)
                 if transcription and transcription.get('text'):
-                    extraction = extract_audio_information(transcription['text'], get_mistral_pipe_lazy()[0])
+                    extraction = extract_audio_information(transcription['text'], get_phi_pipe_lazy()[0])
                     return f"Informations extraites: {extraction}"
                 else:
                     return "Erreur: Extraction impossible sans transcription"
@@ -504,7 +512,7 @@ class LanguageProcessingTool(BaseTool):
                 task = "analyze"
                 target_lang = "fr"
 
-            pipe = get_mistral_pipe_lazy()[0]
+            pipe = get_phi_pipe_lazy()[0]
             if not pipe:
                 return "Erreur: Modèle de langage non disponible"
 
@@ -514,7 +522,7 @@ class LanguageProcessingTool(BaseTool):
                 return response.replace(prompt, "").strip()
 
             elif task == "translate":
-                translation = translate_text_with_mistral(text, target_lang, pipe)
+                translation = translate_text_with_phi(text, target_lang, pipe)
                 return f"Traduction ({target_lang}): {translation}"
 
             elif task == "summarize":
@@ -630,8 +638,8 @@ class PDFSearchTool(BaseTool):
                     analysis += f"   Source: {pdf['source']}\n"
                     analysis += f"   Chemin: {pdf['path']}\n\n"
 
-                # Analyse avec Mistral
-                pipe = get_mistral_pipe_lazy()[0]
+                # Analyse avec Phi
+                pipe = get_phi_pipe_lazy()[0]
                 if pipe:
                     pdf_summary_prompt = f"""
                     Voici une liste de PDFs téléchargés automatiquement pour la requête "{query}":
@@ -642,7 +650,7 @@ class PDFSearchTool(BaseTool):
                     """
 
                     pdf_analysis = pipe(pdf_summary_prompt, max_new_tokens=512, do_sample=True, temperature=0.3)[0]['generated_text']
-                    analysis += f"Analyse Mistral:\n{pdf_analysis.replace(pdf_summary_prompt, '').strip()}"
+                    analysis += f"Analyse Phi:\n{pdf_analysis.replace(pdf_summary_prompt, '').strip()}"
 
                 return analysis
             else:
@@ -830,19 +838,19 @@ class LiveMechanicAssistantTool(BaseTool):
         except Exception as e:
             return f"Erreur caméra/mécanicien : {str(e)}"
 
-# Créer l'agent LangChain avec Mistral
+# Créer l'agent LangChain avec Phi
 @st.cache_resource
 def create_langchain_agent():
-    """Crée un agent LangChain utilisant Mistral comme LLM et nos outils spécialisés"""
+    """Crée un agent LangChain utilisant Phi comme LLM et nos outils spécialisés"""
     try:
-        # Créer le LLM LangChain à partir du pipeline Mistral
-        pipe = get_mistral_pipe_lazy()[0]
+        # Créer le LLM LangChain à partir du pipeline Phi
+        pipe = get_phi_pipe_lazy()[0]
         if not pipe:
             return None
 
-        # Wrapper pour Mistral
-        class MistralLLM(LLM):
-            pipeline: Any = Field(default=None, description='Mistral pipeline')
+        # Wrapper pour Phi
+        class PhiLLM(LLM):
+            pipeline: Any = Field(default=None, description='Phi pipeline')
 
             def __init__(self, pipeline):
                 super().__init__()
@@ -868,9 +876,9 @@ def create_langchain_agent():
 
             @property
             def _llm_type(self):
-                return "mistral_pipeline"
+                return "phi_pipeline"
 
-        llm = MistralLLM(pipe)
+        llm = PhiLLM(pipe)
 
         # Créer les outils
         tools = [
@@ -1398,7 +1406,7 @@ def train_audio(train_data, val_data, epochs=10, device=device):
 
 import faiss
 import torchvision.transforms as T
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 from transformers import AutoProcessor, AutoModel
 
 VIDEO_DIR = os.path.join(BASE_DIR, "videos")
@@ -1488,20 +1496,20 @@ def search_video_rag(query, top_k=5):
         meta = json.load(f)
 
     return [meta[i] for i in indices[0]]
-# ============ LLM AGENT (MISTRAL) ============
-def download_mistral_model():
-    """Télécharge Mistral 7B depuis HuggingFace"""
+# ============ LLM AGENT (PHI) ============
+def download_phi_model():
+    """Télécharge Phi-2 depuis HuggingFace"""
     try:
         from huggingface_hub import snapshot_download
 
-        model_id = "mistralai/Mistral-7B-Instruct-v0.2"
-        local_dir = os.path.join(LLM_DIR, "mistral-7b")
+        model_id = "microsoft/phi-2"
+        local_dir = os.path.join(LLM_DIR, "phi-2")
 
         if os.path.exists(local_dir):
             st.warning("⚠️ Modèle déjà téléchargé.")
             return True
 
-        st.info("🔄 Téléchargement de Mistral-7B (environ 4GB)... Cela peut prendre du temps.")
+        st.info("🔄 Téléchargement de Phi-2 (environ 2.5GB)... Cela peut prendre du temps.")
 
         # Barre de progression
         progress_bar = st.progress(0)
@@ -1529,12 +1537,12 @@ def download_mistral_model():
         st.error(f"Erreur téléchargement: {str(e)}")
         return False
 
-def mistral_agent_test(modality, test_results, context=""):
-    """Agent Mistral qui analyse les résultats de test des autres modèles"""
+def phi_agent_test(modality, test_results, context=""):
+    """Agent Phi qui analyse les résultats de test des autres modèles"""
     try:
-        pipe, tokenizer = get_mistral_pipe_lazy()
+        pipe, tokenizer = get_phi_pipe_lazy()
         if not pipe:
-            return "❌ Agent Mistral non disponible"
+            return "❌ Agent Phi non disponible"
 
         # Construire le prompt pour l'agent
         prompt = f"""Tu es un agent IA expert en analyse de modèles multimodaux. Analyse ces résultats de test pour la modalité {modality}:
@@ -1554,7 +1562,7 @@ Fournis une analyse détaillée incluant:
 Réponse:"""
 
         # Générer réponse
-        with st.spinner("🤖 Agent Mistral analyse les résultats..."):
+        with st.spinner("🤖 Agent Phi analyse les résultats..."):
             outputs = pipe(
                 prompt,
                 max_new_tokens=1024,
@@ -1567,9 +1575,9 @@ Réponse:"""
         return response
 
     except Exception as e:
-        return f"Erreur agent Mistral: {str(e)}"
+        return f"Erreur agent Phi: {str(e)}"
 
-# ============ PDF DOWNLOAD TOOL FOR MISTRAL ============
+# ============ PDF DOWNLOAD TOOL FOR PHI ============
 def search_and_download_pdfs(query, max_results=3, max_retries=3):
     """Recherche et télécharge des PDFs libres de droits depuis des sources académiques avec retry logic"""
     try:
@@ -1962,22 +1970,22 @@ def extract_pdf_from_path(pdf_path, title):
         st.error(f"Erreur extraction PDF: {str(e)}")
         return []
 
-# ============ INTELLIGENT ROBOT SYSTEM WITH MISTRAL BRAIN ============
+# ============ INTELLIGENT ROBOT SYSTEM WITH PHI BRAIN ============
 class IntelligentRobot:
-    """Système robotique intelligent avec Mistral comme cerveau central"""
+    """Système robotique intelligent avec Phi comme cerveau central"""
 
     def __init__(self):
-        self.brain = None  # Mistral model
+        self.brain = None  # Phi model
         self.models = {}  # Domain-specific models
         self.apis = {}  # Inference APIs for each domain
         self.datasets = {}  # Available datasets by type
         self.active_domains = []
 
     def load_brain(self):
-        """Charge le cerveau Mistral"""
+        """Charge le cerveau Phi"""
         try:
             if not self.brain:
-                self.brain = get_mistral_pipe_lazy()[0]
+                self.brain = get_phi_pipe_lazy()[0]
             return self.brain is not None
         except Exception as e:
             st.error(f"Erreur chargement cerveau: {e}")
@@ -2079,7 +2087,7 @@ class IntelligentRobot:
         return api_function
 
     def think_and_decide(self, task, context=""):
-        """Utilise Mistral pour analyser et décider quelle action/robot utiliser"""
+        """Utilise Phi pour analyser et décider quelle action/robot utiliser"""
         if not self.brain:
             return {"error": "Cerveau non disponible"}
 
@@ -2140,7 +2148,7 @@ def initialize_robot_system():
         ],
         "language": [
             ("language_transformers", os.path.join(MODEL_DIR, "language_model")),
-            ("language_mistral", "mistralai/Mistral-7B-Instruct-v0.2")
+            ("language_phi", "microsoft/phi-2")
         ],
         "audio": [
             ("audio_pytorch", os.path.join(MODEL_DIR, "audio_model.pt"))
@@ -2170,7 +2178,7 @@ def initialize_robot_system():
                     api_configs[domain]
                 )
 
-    # Charger le cerveau Mistral
+    # Charger le cerveau Phi
     intelligent_robot.load_brain()
 
     return intelligent_robot
@@ -2226,8 +2234,8 @@ def process_audio_for_translation(audio_path):
         st.error(f"Erreur traitement audio: {e}")
         return None
 
-def translate_text_with_mistral(text, target_language, brain_model):
-    """Traduit du texte vers la langue cible en utilisant Mistral"""
+def translate_text_with_phi(text, target_language, brain_model):
+    """Traduit du texte vers la langue cible en utilisant Phi"""
     if not brain_model or not text.strip():
         return None
 
@@ -2354,7 +2362,7 @@ def robot_intelligent_interface():
         st.markdown("""
         ## 🤖 Système Robotique Intelligent
 
-        ### 🧠 **Cerveau Central - Mistral 7B**
+        ### 🧠 **Cerveau Central - Phi-2**
         - Analyse intelligente des tâches
         - Décision automatique des modèles à utiliser
         - Coordination multimodale
@@ -2367,7 +2375,7 @@ def robot_intelligent_interface():
 
         #### 🗣️ **Langage**
         - `language_transformers`: Classification de texte
-        - `language_mistral`: Génération et analyse avancée
+        - `language_phi`: Génération et analyse avancée
 
         #### 🎵 **Audio**
         - `audio_pytorch`: Classification audio
@@ -2389,7 +2397,7 @@ def robot_intelligent_interface():
 
     with col1:
         brain_status = "✅ Actif" if intelligent_robot.brain else "❌ Inactif"
-        st.metric("🧠 Cerveau Mistral", brain_status)
+        st.metric("🧠 Cerveau Phi", brain_status)
 
     with col2:
         models_count = len([m for m in intelligent_robot.models.values() if m["loaded"]])
@@ -2472,7 +2480,7 @@ def robot_intelligent_interface():
                 # Traduction si demandée
                 if "Traduire" in audio_task and audio_lang_target:
                     with st.spinner(f"🌍 Traduction vers {audio_lang_target}..."):
-                        translation = translate_text_with_mistral(
+                        translation = translate_text_with_phi(
                             transcription['text'],
                             audio_lang_target,
                             intelligent_robot.brain if intelligent_robot.brain else None
@@ -2559,13 +2567,13 @@ Transcription:
 
     if st.button("🚀 Exécuter Tâche Intelligente", type="primary"):
         if task_input.strip():
-            with st.spinner("🧠 Analyse de la tâche par Mistral..."):
+            with st.spinner("🧠 Analyse de la tâche par Phi..."):
                 decision = intelligent_robot.think_and_decide(task_input)
 
             if "error" not in decision:
                 st.success("✅ Analyse terminée!")
 
-                st.markdown("### 🧠 Décision du Cerveau Mistral:")
+                st.markdown("### 🧠 Décision du Cerveau Phi:")
                 st.markdown(decision["analysis"])
 
                 st.markdown("### 🤖 Modèles Disponibles:")
@@ -2606,7 +2614,7 @@ Transcription:
                                         st.markdown("### 📊 Résultats:")
                                         st.json(result)
 
-                                        # Analyse par Mistral des résultats
+                                        # Analyse par Phi des résultats
                                         if st.button("🧠 Analyser les résultats", type="secondary"):
                                             analysis_prompt = f"""
                                             Analyse ces résultats d'exécution robotique:
@@ -2619,7 +2627,7 @@ Transcription:
                                             """
 
                                             if intelligent_robot.brain:
-                                                with st.spinner("🤖 Analyse Mistral..."):
+                                                with st.spinner("🤖 Analyse Phi..."):
                                                     analysis = intelligent_robot.brain(
                                                         analysis_prompt,
                                                         max_new_tokens=512,
@@ -2628,7 +2636,7 @@ Transcription:
                                                         top_p=0.9
                                                     )[0]['generated_text'].replace(analysis_prompt, "").strip()
 
-                                                st.markdown("### 🤖 Analyse Mistral:")
+                                                st.markdown("### 🤖 Analyse Phi:")
                                                 st.markdown(analysis)
                                     else:
                                         st.error(f"❌ Erreur: {result['error']}")
@@ -2669,7 +2677,7 @@ Transcription:
     # Export de configuration
     if st.button("📤 Exporter Configuration Robot"):
         config = {
-            "brain": "mistral-7b",
+            "brain": "phi-2",
             "models": intelligent_robot.models,
             "apis": {name: str(info["api"]) for name, info in intelligent_robot.models.items()},
             "domains": intelligent_robot.active_domains
@@ -2688,7 +2696,7 @@ Transcription:
 # ============ LEROBOT FUNCTIONS ============
 @st.cache_resource
 def load_lerobot_model(model_name="lerobot/act_aloha_sim_transfer_cube_human"):
-    """Charge un modèle LeRobot depuis HuggingFace"""
+    """Charge un modèle LeRobot depuis HuggingFace avec optimisation mémoire"""
     try:
         if not LEROBOT_AVAILABLE:
             st.error("❌ LeRobot n'est pas installé.")
@@ -2699,21 +2707,56 @@ def load_lerobot_model(model_name="lerobot/act_aloha_sim_transfer_cube_human"):
 
         # Local directory for the model
         local_dir = os.path.join(ROBOTICS_DIR, model_name.replace("/", "_"))
-        
+
         if not os.path.exists(local_dir):
             st.warning(f"Modèle non trouvé localement: {local_dir}")
             return None
 
-        # Try to load using from_pretrained
+        # Configuration d'optimisation mémoire
+        memory_optimization = st.sidebar.checkbox("🔧 Optimisation mémoire GPU", value=True)
+
+        if memory_optimization:
+            # Libérer la mémoire GPU avant le chargement
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                st.info("🧹 Mémoire GPU nettoyée")
+
+            # Variables d'environnement pour optimisation CUDA
+            os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
+
+        # Try to load using from_pretrained with memory optimization
         try:
+            st.info("🔄 Chargement du modèle LeRobot (optimisé)...")
+
+            # Charger d'abord en mode eval pour économiser de la mémoire
             policy = ACTPolicy.from_pretrained(local_dir)
             policy.eval()
-            st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès!")
+
+            # Si GPU disponible et optimisation activée, tenter le transfert progressif
+            if torch.cuda.is_available() and memory_optimization:
+                try:
+                    # Transfert progressif pour éviter les pics de mémoire
+                    policy.to(device)
+                    st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès (GPU optimisé)!")
+                except RuntimeError as gpu_error:
+                    if "out of memory" in str(gpu_error).lower():
+                        st.warning("⚠️ Mémoire GPU insuffisante, utilisation du CPU")
+                        device_cpu = torch.device('cpu')
+                        policy.to(device_cpu)
+                        st.success(f"✅ Modèle LeRobot {model_name} chargé sur CPU!")
+                    else:
+                        raise gpu_error
+            else:
+                # Transfert direct
+                policy.to(device)
+                st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès!")
+
             return policy
+
         except Exception as e:
             st.warning(f"from_pretrained failed: {e}, trying manual loading...")
-            
-            # Fallback: manual loading
+
+            # Fallback: manual loading avec optimisation mémoire
             from lerobot.policies.act.configuration_act import ACTConfig
             import json
             from safetensors import safe_open
@@ -2723,50 +2766,118 @@ def load_lerobot_model(model_name="lerobot/act_aloha_sim_transfer_cube_human"):
             if not os.path.exists(config_path):
                 st.error(f"Config non trouvé: {config_path}")
                 return None
-                
+
             with open(config_path, "r") as f:
                 config_dict = json.load(f)
-            
+
             # Remove 'type' parameter as it's not accepted by ACTConfig
             config_dict.pop('type', None)
-            
+
             # Create ACT config
             config = ACTConfig(**config_dict)
-            
-            # Load the model
+
+            # Load the model avec quantification si nécessaire
             policy = ACTPolicy(config)
-            
-            # Load weights from safetensors
+
+            # Tentative de quantification pour réduire la mémoire
+            if memory_optimization and torch.cuda.is_available():
+                try:
+                    from torch.quantization import quantize_dynamic
+                    policy = quantize_dynamic(policy, {torch.nn.Linear}, dtype=torch.qint8)
+                    st.info("🔧 Quantification 8-bit appliquée pour économiser la mémoire")
+                except Exception as quant_error:
+                    st.warning(f"⚠️ Quantification impossible: {quant_error}")
+
+            # Load weights from safetensors avec memory mapping
             model_path = os.path.join(local_dir, "model.safetensors")
-            if os.path.exists(model_path):
-                with safe_open(model_path, framework='pt') as f:
-                    state_dict = {}
-                    for key in f.keys():
-                        state_dict[key] = f.get_tensor(key)
-                
-                # Load state dict
-                policy.load_state_dict(state_dict)
-                policy.eval()
-                
-                st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès (manual)!")
-                return policy
-            else:
+            if not os.path.exists(model_path):
                 st.error(f"Fichier modèle non trouvé: {model_path}")
                 return None
-        
+
+            try:
+                with safe_open(model_path, framework='pt', device='cpu') as f:  # Charger sur CPU d'abord
+                    state_dict = {}
+                    total_params = len(f.keys())
+                    progress_bar = st.progress(0)
+
+                    for i, key in enumerate(f.keys()):
+                        tensor = f.get_tensor(key)
+                        # Quantifier les poids si optimisation activée
+                        if memory_optimization and tensor.dtype == torch.float32:
+                            tensor = tensor.half()  # FP16 pour économiser la mémoire
+                        state_dict[key] = tensor
+
+                        # Mise à jour de la barre de progression
+                        progress_bar.progress((i + 1) / total_params)
+
+                    progress_bar.empty()
+
+                # Charger le state dict
+                policy.load_state_dict(state_dict)
+                policy.eval()
+
+                # Transfert vers GPU avec gestion d'erreur
+                if torch.cuda.is_available():
+                    try:
+                        policy.to(device)
+                        st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès (manual + optimisé)!")
+                    except RuntimeError as gpu_error:
+                        if "out of memory" in str(gpu_error).lower():
+                            st.warning("⚠️ GPU insuffisant, modèle chargé sur CPU")
+                            device_cpu = torch.device('cpu')
+                            policy.to(device_cpu)
+                            st.success(f"✅ Modèle LeRobot {model_name} chargé sur CPU (manual)!")
+                        else:
+                            raise gpu_error
+                else:
+                    st.success(f"✅ Modèle LeRobot {model_name} chargé avec succès (CPU)!")
+
+                return policy
+
+            except Exception as load_error:
+                st.error(f"Erreur chargement manuel: {str(load_error)}")
+                # Essayer avec un modèle plus petit en fallback
+                st.warning("🔄 Tentative avec un modèle mock optimisé...")
+
+                class OptimizedLeRobotPolicy:
+                    def __init__(self, model_name):
+                        self.name = model_name
+                        self.device = torch.device('cpu')  # Forcer CPU pour éviter OOM
+
+                    def select_action(self, observation):
+                        # Action mock optimisée (pas de calcul lourd)
+                        return torch.randn(14, dtype=torch.float16).to(self.device)  # 14 DoF pour Aloha
+
+                    def to(self, device):
+                        self.device = device
+                        return self
+
+                    def eval(self):
+                        return self
+
+                st.warning("Utilisation de la politique mock optimisée en fallback")
+                return OptimizedLeRobotPolicy(model_name)
+
     except Exception as e:
         st.error(f"Erreur chargement LeRobot: {str(e)}")
-        # Return mock policy as fallback
-        class MockLeRobotPolicy:
+        # Return optimized mock policy as fallback
+        class OptimizedMockLeRobotPolicy:
             def __init__(self):
                 self.name = model_name
-                
+                self.device = torch.device('cpu')
+
             def select_action(self, observation):
-                # Mock action selection
-                return torch.randn(14)  # 14 DoF for Aloha robot
-                
-        st.warning("Utilisation de la politique mock en fallback")
-        return MockLeRobotPolicy()
+                return torch.randn(14, dtype=torch.float16).to(self.device)
+
+            def to(self, device):
+                self.device = device
+                return self
+
+            def eval(self):
+                return self
+
+        st.warning("Utilisation de la politique mock optimisée en fallback")
+        return OptimizedMockLeRobotPolicy()
 
 def download_lerobot_model(model_name="lerobot/aloha_mobile_shrimp"):
     """Télécharge un modèle LeRobot"""
@@ -2860,8 +2971,37 @@ def test_model(modality, file_path, model_path=None, text_model=None):
             st.write("🧠 NLP :", res[0]['generated_text'])
     except Exception as e:
         st.error(f"Erreur test: {str(e)}")
-# ============ INTERFACE STREAMLIT ============
-st.sidebar.title("⚙️ Contrôle Multimodal v2.0")
+def optimize_gpu_memory():
+    """Optimise la mémoire GPU pour éviter les erreurs CUDA out of memory"""
+    try:
+        if torch.cuda.is_available():
+            # Nettoyer le cache GPU
+            torch.cuda.empty_cache()
+
+            # Configuration CUDA optimisée
+            os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:512'
+
+            # Synchroniser pour s'assurer que tout est nettoyé
+            torch.cuda.synchronize()
+
+            # Obtenir les informations mémoire
+            memory_info = torch.cuda.mem_get_info()
+            total_memory = memory_info[1] / 1024**3  # En GB
+            used_memory = (memory_info[1] - memory_info[0]) / 1024**3  # En GB
+            free_memory = memory_info[0] / 1024**3  # En GB
+
+            st.sidebar.success(f"🧹 GPU optimisé - Libre: {free_memory:.1f}GB / {total_memory:.1f}GB")
+            return True
+        else:
+            st.sidebar.info("💻 Mode CPU - Pas d'optimisation GPU nécessaire")
+            return False
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ Erreur optimisation GPU: {str(e)}")
+        return False
+
+# Ajouter l'optimisation GPU dans la sidebar
+if st.sidebar.button("🧹 Optimiser Mémoire GPU", type="secondary"):
+    optimize_gpu_memory()
 
 # Section Aide et Documentation
 with st.sidebar.expander("📚 Aide & Cas d'utilisation"):
@@ -2965,7 +3105,7 @@ if mode == "📖 Mode d'Emploi":
 
         | Bouton | Où il est | À quoi il sert vraiment |
         |-------|---------|-------------------------|
-        | **Charger Modèle** (sidebar) | Toujours laisser coché | Mistral-7B prêt en 4-bit |
+        | **Charger Modèle** (sidebar) | Toujours laisser coché | Phi-2 prêt en 4-bit |
         | **Multi PDF Downloader** | Dans le chat LangChain | Télécharge 5 à 80 PDFs en 1 phrase |
         | **Importer** (Importation Données) | Après avoir glissé les PDFs | Lance l'usine à dataset |
         | **Captionneur Aérodynamique Gabonais** | Gabon Edition | Transforme 10 000 images en texte expert |
@@ -3099,6 +3239,773 @@ elif mode == "📥 Importation Données":
                 elif d["type"] == "audio":
                     st.audio(d["audio_path"])
                     st.text_area("Transcript :", d["transcript"], height=150)
+    # =====================================================
+    #  TCHAM AI STUDIO – UPLOAD ZIP + EXPLORATION AUDIO
+    # =====================================================
+    st.header("🇬🇦🎵 TCHAM AI STUDIO – Upload & Analyse du Dataset Audio")
+    st.write("Upload un **fichier ZIP contenant toutes tes musiques Tcham**.")
+
+    # -----------------------------------------
+    # 1) UPLOAD DU FICHIER ZIP
+    # -----------------------------------------
+    uploaded_zip = st.file_uploader("📁 Upload ton dossier Tcham (format ZIP)", type=["zip"])
+
+    if uploaded_zip is not None:
+        st.success("ZIP reçu ✔️")
+
+        # Création dossier temporaire
+        temp_dir = tempfile.mkdtemp()
+        zip_path = os.path.join(temp_dir, "tcham.zip")
+
+        # On sauvegarde le ZIP
+        with open(zip_path, "wb") as f:
+            f.write(uploaded_zip.read())
+
+        # Dézipper
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        st.success("📦 ZIP dézippé avec succès !")
+
+        # Détection automatique du dossier audio
+        def find_audio_folder(path):
+            audio_folders = []
+            total_audio_files = 0
+
+            st.info("🔍 Recherche de fichiers audio dans le ZIP...")
+
+            for root, dirs, files in os.walk(path):
+                audio_files_in_folder = [f for f in files if f.lower().endswith(('.wav', '.mp3', '.flac', '.aac', '.ogg', '.m4a'))]
+                if audio_files_in_folder:
+                    audio_folders.append((root, len(audio_files_in_folder)))
+                    total_audio_files += len(audio_files_in_folder)
+                    st.info(f"📁 Trouvé {len(audio_files_in_folder)} fichier(s) audio dans : {os.path.basename(root)}")
+
+            if not audio_folders:
+                return None
+
+            # Choisir le dossier avec le plus de fichiers audio
+            best_folder = max(audio_folders, key=lambda x: x[1])[0]
+
+            st.success(f"✅ {total_audio_files} fichier(s) audio trouvé(s) au total")
+            st.info(f"📂 Dossier sélectionné : {os.path.basename(best_folder)}")
+
+            return best_folder
+
+        audio_folder = find_audio_folder(temp_dir)
+
+        if audio_folder is None:
+            st.error("❌ Aucun fichier audio trouvé dans le ZIP.")
+            st.error("Vérifiez que votre ZIP contient des fichiers audio aux formats suivants :")
+            st.error("- WAV, MP3, FLAC, AAC, OGG, M4A, AIFF, AU")
+            st.stop()
+
+        st.info(f"📂 Dossier détecté : {audio_folder}")
+
+        # Vérifier que le dossier existe et contient des fichiers
+        if not os.path.exists(audio_folder):
+            st.error(f"❌ Le dossier audio n'existe pas : {audio_folder}")
+            st.stop()
+
+        audio_files_in_folder = [f for f in os.listdir(audio_folder) if f.lower().endswith(('.wav', '.mp3', '.flac', '.aac', '.ogg', '.m4a', '.aiff', '.au'))]
+        if not audio_files_in_folder:
+            st.error(f"❌ Aucun fichier audio trouvé dans : {audio_folder}")
+            st.error("Fichiers présents dans le dossier :")
+            for f in os.listdir(audio_folder)[:10]:  # Montrer max 10 fichiers
+                st.error(f"  - {f}")
+            st.stop()
+
+        st.success(f"🎵 {len(audio_files_in_folder)} fichiers audio détectés")
+
+        # -----------------------------------------
+        # 2) CHARGEMENT DATASET HF
+        # -----------------------------------------
+        try:
+            st.info("🔄 Chargement du dataset audio...")
+
+            # Validation préalable des fichiers audio
+            st.info("🔍 Validation des fichiers audio...")
+            valid_audio_files = []
+            invalid_files = []
+
+            import librosa
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            for i, audio_file in enumerate(audio_files_in_folder):
+                audio_path = os.path.join(audio_folder, audio_file)
+                status_text.text(f"🔍 Validation de {audio_file}...")
+
+                try:
+                    # Essayer de charger les métadonnées du fichier avec gestion d'erreurs spécifiques
+                    duration = librosa.get_duration(filename=audio_path)
+                    if duration > 0:  # Fichier valide avec durée > 0
+                        valid_audio_files.append(audio_file)
+                    else:
+                        invalid_files.append(f"{audio_file} (durée nulle)")
+                except Exception as e:
+                    error_str = str(e).lower()
+                    # Gestion spécifique des erreurs libmpg123 et ID3
+                    if "libmpg123" in error_str or "id3" in error_str or "comment" in error_str:
+                        invalid_files.append(f"{audio_file} (métadonnées ID3 corrompues)")
+                    else:
+                        invalid_files.append(f"{audio_file} (erreur: {str(e)[:50]})")
+
+                # Mettre à jour la barre de progression
+                progress_bar.progress((i + 1) / len(audio_files_in_folder))
+
+            status_text.empty()
+            progress_bar.empty()
+
+            if invalid_files:
+                st.warning(f"⚠️ {len(invalid_files)} fichier(s) audio problématique(s) détecté(s):")
+                for invalid in invalid_files[:5]:  # Montrer max 5
+                    st.warning(f"  - {invalid}")
+                if len(invalid_files) > 5:
+                    st.warning(f"  ... et {len(invalid_files) - 5} autres")
+
+                # Option pour réparer automatiquement les fichiers avec FFmpeg
+                st.info("🔧 **Solution automatique :** Réparer les fichiers audio avec FFmpeg")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    if st.button("🔧 Réparer automatiquement avec FFmpeg", type="primary"):
+                        with st.spinner("🔄 Réparation automatique des fichiers audio..."):
+                            import subprocess
+
+                            repaired_count = 0
+                            failed_count = 0
+
+                            # Créer un dossier pour les fichiers réparés
+                            fixed_audio_dir = os.path.join(audio_folder, "fixed_audio")
+                            os.makedirs(fixed_audio_dir, exist_ok=True)
+
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+
+                            for i, invalid_entry in enumerate(invalid_files):
+                                # Extraire le nom du fichier
+                                invalid_filename = invalid_entry.split(' (')[0]
+                                src_path = os.path.join(audio_folder, invalid_filename)
+
+                                # Générer le nom de fichier de destination
+                                base_name = os.path.splitext(invalid_filename)[0]
+                                dst_path = os.path.join(fixed_audio_dir, f"{base_name}_fixed.wav")
+
+                                status_text.text(f"🔧 Réparation de {invalid_filename}...")
+
+                                try:
+                                    # Commande FFmpeg pour réparer le fichier avec nettoyage des métadonnées ID3
+                                    cmd = [
+                                        "ffmpeg",
+                                        "-y",  # overwrite
+                                        "-i", src_path,
+                                        "-ar", "16000",  # 16 kHz sample rate
+                                        "-ac", "1",  # mono
+                                        "-c:a", "pcm_s16le",  # WAV format propre
+                                        "-af", "highpass=f=80,lowpass=f=8000",  # Filtre audio pour nettoyer
+                                        "-map_metadata", "-1",  # Supprimer toutes les métadonnées
+                                        "-fflags", "+discardcorrupt",  # Ignorer les paquets corrompus
+                                        dst_path
+                                    ]
+
+                                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+                                    if result.returncode == 0:
+                                        repaired_count += 1
+                                        st.success(f"✅ {invalid_filename} réparé")
+                                    else:
+                                        failed_count += 1
+                                        st.error(f"❌ Échec réparation {invalid_filename}: {result.stderr[:100]}")
+
+                                except subprocess.TimeoutExpired:
+                                    failed_count += 1
+                                    st.error(f"❌ Timeout réparation {invalid_filename}")
+                                except Exception as e:
+                                    failed_count += 1
+                                    st.error(f"❌ Erreur réparation {invalid_filename}: {str(e)}")
+
+                                # Mettre à jour la barre de progression
+                                progress_bar.progress((i + 1) / len(invalid_files))
+
+                            status_text.empty()
+                            progress_bar.empty()
+
+                            if repaired_count > 0:
+                                st.success(f"🎉 {repaired_count} fichier(s) réparé(s) avec succès!")
+                                st.info(f"📂 Fichiers réparés dans : {fixed_audio_dir}")
+
+                                # Option pour utiliser les fichiers réparés
+                                if st.button("📂 Utiliser les fichiers réparés", type="secondary"):
+                                    # Copier les fichiers réparés vers le dossier principal
+                                    for fixed_file in os.listdir(fixed_audio_dir):
+                                        if fixed_file.endswith('_fixed.wav'):
+                                            src = os.path.join(fixed_audio_dir, fixed_file)
+                                            dst = os.path.join(audio_folder, fixed_file)
+                                            try:
+                                                import shutil
+                                                shutil.copy2(src, dst)
+                                                st.info(f"📋 Copié : {fixed_file}")
+                                            except Exception as e:
+                                                st.warning(f"⚠️ Erreur copie {fixed_file}: {e}")
+
+                                    # Supprimer les fichiers originaux problématiques
+                                    for invalid_entry in invalid_files:
+                                        invalid_filename = invalid_entry.split(' (')[0]
+                                        invalid_path = os.path.join(audio_folder, invalid_filename)
+                                        try:
+                                            if os.path.exists(invalid_path):
+                                                os.remove(invalid_path)
+                                                st.info(f"🗑️ Supprimé : {invalid_filename}")
+                                        except Exception as e:
+                                            st.warning(f"⚠️ Impossible de supprimer {invalid_filename}: {e}")
+
+                                    st.success("✅ Dataset nettoyé ! Relancez l'import.")
+                                    st.rerun()
+
+                            if failed_count > 0:
+                                st.warning(f"⚠️ {failed_count} fichier(s) n'ont pas pu être réparés")
+
+                with col2:
+                    if st.button("🔄 Continuer sans réparation", type="secondary"):
+                        st.info("🔄 Suppression des fichiers invalides...")
+                        for invalid_entry in invalid_files:
+                            # Extraire le nom du fichier de l'entrée (format: "filename.mp3 (erreur: ...)")
+                            invalid_filename = invalid_entry.split(' (')[0]
+                            invalid_path = os.path.join(audio_folder, invalid_filename)
+                            try:
+                                if os.path.exists(invalid_path):
+                                    os.remove(invalid_path)
+                                    st.info(f"🗑️ Supprimé : {invalid_filename}")
+                            except Exception as e:
+                                st.warning(f"⚠️ Impossible de supprimer {invalid_filename}: {e}")
+
+                        # Recalculer la liste des fichiers valides
+                        audio_files_in_folder = [f for f in os.listdir(audio_folder) if f.lower().endswith(('.wav', '.mp3', '.flac', '.aac', '.ogg', '.m4a', '.aiff', '.au'))]
+                        valid_audio_files = [f for f in audio_files_in_folder]  # Tous restants sont considérés valides
+                        st.success(f"✅ {len(valid_audio_files)} fichier(s) valide(s) restant(s)")
+                        st.rerun()
+
+            if not valid_audio_files:
+                st.error("❌ Aucun fichier audio valide trouvé!")
+                st.error("### 💡 Solutions possibles :")
+                st.error("1. **Vérifiez la qualité des fichiers** : Certains fichiers peuvent être corrompus")
+                st.error("2. **Formats alternatifs** : Essayez avec des fichiers WAV ou FLAC")
+                st.error("3. **Taille des fichiers** : Évitez les fichiers trop volumineux")
+                st.stop()
+
+            st.success(f"✅ {len(valid_audio_files)} fichier(s) audio valide(s) sur {len(audio_files_in_folder)}")
+
+            # ===============================================
+            # 🔧 PRÉ-TRAITEMENT AVANCÉ POUR M4A ET FICHIERS PROBLÉMATIQUES
+            # ===============================================
+            import re
+            import subprocess
+
+            def convert_to_wav(input_file, output_file):
+                """Convertit un fichier audio en WAV avec FFmpeg"""
+                try:
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", input_file,
+                        "-ac", "1",  # mono
+                        "-ar", "16000",  # 16kHz
+                        "-c:a", "pcm_s16le",  # WAV propre
+                        "-af", "highpass=f=80,lowpass=f=8000",  # Filtre audio
+                        "-map_metadata", "-1",  # Supprimer métadonnées
+                        "-fflags", "+discardcorrupt",  # Ignorer paquets corrompus
+                        output_file
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                    return True
+                except:
+                    return False
+
+            def clean_filename(name):
+                """Nettoie le nom de fichier des caractères spéciaux"""
+                name = name.lower()
+                name = re.sub(r'[^a-z0-9\-_\.]', '_', name)
+                return name
+
+            def safe_audio_check(audio_path):
+                """Vérification de sécurité avancée des fichiers audio"""
+                try:
+                    # Test rapide avec librosa (1 seconde)
+                    y, sr = librosa.load(audio_path, sr=None, duration=1.0)
+                    # Vérifications de sécurité
+                    if y is None or len(y) < 2205:  # Moins de 0.1 seconde à 22050Hz
+                        return False, "Fichier trop court ou vide"
+                    if sr < 8000 or sr > 48000:  # Sample rate anormal
+                        return False, f"Sample rate anormal: {sr}Hz"
+                    return True, "OK"
+                except Exception as e:
+                    return False, str(e)
+
+            # Appliquer le pré-traitement
+            st.info("🔧 Pré-traitement avancé des fichiers audio...")
+            processed_files = []
+            conversion_count = 0
+            cleaned_count = 0
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            for i, audio_file in enumerate(valid_audio_files):
+                audio_path = os.path.join(audio_folder, audio_file)
+                status_text.text(f"🔍 Traitement de {audio_file}...")
+
+                # 1. Nettoyer le nom de fichier si nécessaire
+                original_name = audio_file
+                cleaned_name = clean_filename(audio_file)
+                if cleaned_name != audio_file:
+                    new_path = os.path.join(audio_folder, cleaned_name)
+                    try:
+                        os.rename(audio_path, new_path)
+                        audio_path = new_path
+                        audio_file = cleaned_name
+                        cleaned_count += 1
+                        status_text.text(f"📝 Renommé : {original_name} → {cleaned_name}")
+                    except Exception as e:
+                        st.warning(f"⚠️ Impossible de renommer {audio_file}: {e}")
+
+                # 2. Convertir M4A en WAV automatiquement
+                if audio_file.lower().endswith('.m4a'):
+                    wav_name = audio_file.replace('.m4a', '.wav')
+                    wav_path = os.path.join(audio_folder, wav_name)
+
+                    status_text.text(f"🔄 Conversion M4A → WAV : {audio_file}")
+                    if convert_to_wav(audio_path, wav_path):
+                        # Supprimer l'original et utiliser le WAV
+                        try:
+                            os.remove(audio_path)
+                            audio_path = wav_path
+                            audio_file = wav_name
+                            conversion_count += 1
+                            status_text.text(f"✅ Converti : {original_name} → {wav_name}")
+                        except Exception as e:
+                            st.warning(f"⚠️ Erreur suppression fichier original: {e}")
+                    else:
+                        st.warning(f"⚠️ Échec conversion {audio_file}")
+
+                # 3. Vérification de sécurité finale
+                is_safe, safety_msg = safe_audio_check(audio_path)
+                if not is_safe:
+                    st.warning(f"⚠️ Fichier rejeté {audio_file}: {safety_msg}")
+                    continue
+
+                processed_files.append(audio_file)
+                progress_bar.progress((i + 1) / len(valid_audio_files))
+
+            status_text.empty()
+            progress_bar.empty()
+
+            if conversion_count > 0 or cleaned_count > 0:
+                st.success(f"✅ Pré-traitement terminé : {conversion_count} conversions M4A→WAV, {cleaned_count} noms nettoyés")
+                st.success(f"📊 {len(processed_files)} fichiers prêts pour le dataset")
+
+                # Mettre à jour la liste des fichiers valides
+                valid_audio_files = processed_files
+            else:
+                st.info("ℹ️ Aucun pré-traitement nécessaire")
+
+            # Essayer de charger le dataset avec les fichiers valides
+            try:
+                ds = load_dataset(
+                    "audiofolder",
+                    data_dir=audio_folder,
+                    split="train"
+                )
+                st.success(f"🎧 {len(ds)} fichiers audio chargés avec succès !")
+            except Exception as dataset_error:
+                st.warning(f"⚠️ Échec du chargement standard : {str(dataset_error)}")
+                st.info("🔄 Tentative de chargement alternatif avec validation renforcée...")
+
+                # Méthode alternative ultra-robuste : validation individuelle + conversion automatique
+                try:
+                    from datasets import Dataset, Audio
+                    import pandas as pd
+                    import subprocess
+                    import tempfile
+                    import shutil
+
+                    # Créer un dossier temporaire pour les fichiers validés
+                    temp_audio_dir = os.path.join(BASE_DIR, "temp_audio_validated")
+                    os.makedirs(temp_audio_dir, exist_ok=True)
+
+                    validated_files = []
+                    conversion_count = 0
+
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    for i, audio_file in enumerate(valid_audio_files):
+                        audio_path = os.path.join(audio_folder, audio_file)
+                        status_text.text(f"🔍 Validation de {audio_file}...")
+
+                        try:
+                            # Test de chargement avec librosa
+                            y, sr = librosa.load(audio_path, sr=None, duration=1.0)  # Charger seulement 1 seconde pour test
+
+                            # Si ça marche, copier le fichier dans le dossier temporaire
+                            temp_path = os.path.join(temp_audio_dir, audio_file)
+                            shutil.copy2(audio_path, temp_path)
+                            validated_files.append(audio_file)
+
+                        except Exception as librosa_error:
+                            # Si librosa échoue, essayer une conversion FFmpeg automatique
+                            try:
+                                base_name = os.path.splitext(audio_file)[0]
+                                converted_path = os.path.join(temp_audio_dir, f"{base_name}_converted.wav")
+
+                                status_text.text(f"🔧 Conversion automatique de {audio_file}...")
+
+                                # Commande FFmpeg pour conversion forcée avec nettoyage des métadonnées
+                                cmd = [
+                                    "ffmpeg",
+                                    "-y",  # overwrite
+                                    "-i", audio_path,
+                                    "-ar", "16000",  # 16 kHz
+                                    "-ac", "1",  # mono
+                                    "-c:a", "pcm_s16le",  # WAV propre
+                                    "-af", "highpass=f=80,lowpass=f=8000",  # Filtre audio
+                                    "-map_metadata", "-1",  # Supprimer toutes les métadonnées
+                                    "-fflags", "+discardcorrupt",  # Ignorer les paquets corrompus
+                                    converted_path
+                                ]
+
+                                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+
+                                if result.returncode == 0:
+                                    # Vérifier que le fichier converti est lisible
+                                    y, sr = librosa.load(converted_path, sr=None, duration=1.0)
+                                    validated_files.append(f"{base_name}_converted.wav")
+                                    conversion_count += 1
+                                    st.info(f"✅ Converti : {audio_file} → {base_name}_converted.wav")
+                                else:
+                                    st.warning(f"⚠️ Conversion échouée pour {audio_file}: {result.stderr[:100]}")
+
+                            except Exception as conversion_error:
+                                st.warning(f"⚠️ Impossible de traiter {audio_file}: {str(conversion_error)}")
+
+                        # Mettre à jour la barre de progression
+                        progress_bar.progress((i + 1) / len(valid_audio_files))
+
+                    status_text.empty()
+                    progress_bar.empty()
+
+                    if validated_files:
+                        st.success(f"✅ {len(validated_files)} fichiers validés ({conversion_count} conversions automatiques)")
+
+                        # Charger le dataset depuis le dossier temporaire
+                        try:
+                            ds = load_dataset(
+                                "audiofolder",
+                                data_dir=temp_audio_dir,
+                                split="train"
+                            )
+                            st.success(f"🎧 Dataset chargé avec succès : {len(ds)} fichiers !")
+
+                            # Copier les fichiers validés vers le dossier principal pour les futures utilisations
+                            if st.button("💾 Sauvegarder les fichiers validés", type="secondary"):
+                                for validated_file in validated_files:
+                                    src = os.path.join(temp_audio_dir, validated_file)
+                                    dst = os.path.join(audio_folder, validated_file)
+                                    try:
+                                        shutil.copy2(src, dst)
+                                        st.info(f"📋 Sauvegardé : {validated_file}")
+                                    except Exception as e:
+                                        st.warning(f"⚠️ Erreur sauvegarde {validated_file}: {e}")
+                                    st.success("✅ Fichiers sauvegardés pour utilisation future!")
+
+                                # Nettoyer le dossier temporaire
+                                try:
+                                    shutil.rmtree(temp_audio_dir)
+                                except:
+                                    pass
+                        except Exception as temp_load_error:
+                            st.warning(f"⚠️ Échec du chargement depuis le dossier temporaire : {str(temp_load_error)}")
+                            st.info("🔄 Tentative de création manuelle du dataset...")
+
+                            # Dernière tentative : création complètement manuelle
+                            audio_data = []
+                            for validated_file in validated_files[:50]:  # Limiter à 50 fichiers max
+                                temp_path = os.path.join(temp_audio_dir, validated_file)
+                                try:
+                                    y, sr = librosa.load(temp_path, sr=None)
+                                    # Vérification de sécurité supplémentaire
+                                    if y is None or len(y) < 2205:  # Moins de 0.1 seconde
+                                        st.warning(f"⚠️ Fichier rejeté (trop court): {validated_file}")
+                                        continue
+                                    audio_data.append({
+                                        "audio": {"path": temp_path, "array": y, "sampling_rate": sr},
+                                        "file": validated_file
+                                    })
+                                except Exception as e:
+                                    st.warning(f"⚠️ Impossible de charger {validated_file}: {str(e)}")
+
+                            # Nettoyage automatique des données audio pour HF Datasets
+                            if audio_data:
+                                import numpy as np
+
+                                MAX_LEN = 30 * 16000  # 30 secondes à 16kHz
+                                clean_audio_data = []
+
+                                for item in audio_data:
+                                    arr = item["audio"]["array"]
+                                    sr = item["audio"]["sampling_rate"]
+
+                                    # Rééchantillonnage automatique si différent de 16kHz
+                                    if sr != 16000:
+                                        arr = librosa.resample(arr, orig_sr=sr, target_sr=16000)
+                                        sr = 16000
+
+                                    # Tronquage des longs audios (>30 secondes)
+                                    if len(arr) > MAX_LEN:
+                                        arr = arr[:MAX_LEN]
+
+                                    clean_audio_data.append({
+                                        "audio": {
+                                            "path": item["audio"]["path"],
+                                            "array": arr.astype(np.float32),
+                                            "sampling_rate": sr
+                                        },
+                                        "file": item["file"]
+                                    })
+
+                                st.info(f"✅ Nettoyage audio terminé : {len(clean_audio_data)} fichiers prêts pour HF Datasets")
+
+                                # Créer le dataset avec les données nettoyées
+                                from datasets import Dataset
+
+                                ds = Dataset.from_list(clean_audio_data)
+
+                                st.success(f"🎧 Dataset HF créé avec {len(ds)} fichiers !")
+                                st.info("💡 Dataset compatible avec HuggingFace - tous les fichiers < 30 secondes")
+                            else:
+                                raise Exception("Aucun fichier audio n'a pu être chargé même après conversion")
+
+                    else:
+                        raise Exception("Aucun fichier audio n'a passé la validation")
+
+                except Exception as alt_error:
+                    # Nettoyer le dossier temporaire en cas d'erreur
+                    try:
+                        if os.path.exists(temp_audio_dir):
+                            shutil.rmtree(temp_audio_dir)
+                    except:
+                        pass
+
+                    st.error(f"❌ Échec du chargement alternatif : {str(alt_error)}")
+                    st.error("### 🔍 Diagnostic avancé :")
+
+                    # Vérifier les détails des fichiers problématiques
+                    st.error("**Échantillon des fichiers originaux :**")
+                    for i, audio_file in enumerate(valid_audio_files[:5]):
+                        audio_path = os.path.join(audio_folder, audio_file)
+                        file_size = os.path.getsize(audio_path) if os.path.exists(audio_path) else 0
+                        try:
+                            duration = librosa.get_duration(filename=audio_path)
+                            st.error(f"  - {audio_file}: {file_size} bytes, {duration:.1f}s")
+                        except:
+                            st.error(f"  - {audio_file}: {file_size} bytes, durée inconnue")
+
+                    st.error("### 💡 Solutions avancées :")
+                    st.error("1. **Formats recommandés** : WAV 16-bit 44.1kHz ou MP3 320kbps")
+                    st.error("2. **Taille des fichiers** : < 50MB par fichier")
+                    st.error("3. **Qualité audio** : Éviter les fichiers corrompus ou de mauvaise qualité")
+                    st.error("4. **Métadonnées ID3** : Les fichiers MP3 avec métadonnées corrompues sont automatiquement réparés")
+                    st.error("5. **Conversion manuelle** : ffmpeg -i input.mp3 -ar 16000 -ac 1 -map_metadata -1 output.wav")
+                    st.error("6. **Test individuel** : Tester d'abord avec 1-2 fichiers seulement")
+
+                    # Bouton pour réessayer avec un sous-ensemble
+                    if st.button("🔄 Réessayer avec 5 fichiers seulement"):
+                        st.info("🔄 Tentative avec un petit sous-ensemble...")
+                        try:
+                            from datasets import Dataset, Audio
+                            import pandas as pd
+
+                            audio_data = []
+                            test_files = valid_audio_files[:5]
+
+                            for audio_file in test_files:
+                                audio_path = os.path.join(audio_folder, audio_file)
+                                try:
+                                    # Conversion automatique si nécessaire
+                                    y, sr = librosa.load(audio_path, sr=None)
+                                    # Vérification de sécurité
+                                    if y is None or len(y) < 2205:  # Moins de 0.1 seconde
+                                        st.warning(f"⚠️ Fichier rejeté (trop court): {audio_file}")
+                                        continue
+                                    audio_data.append({
+                                        "audio": {"path": audio_path, "array": y, "sampling_rate": sr},
+                                        "file": audio_file
+                                    })
+                                except Exception as e:
+                                    st.warning(f"⚠️ Impossible de charger {audio_file}: {str(e)}")
+
+                            if audio_data:
+                                # Nettoyage automatique des données audio pour HF Datasets
+                                import numpy as np
+
+                                MAX_LEN = 30 * 16000  # 30 secondes à 16kHz
+                                clean_audio_data = []
+
+                                for item in audio_data:
+                                    arr = item["audio"]["array"]
+                                    sr = item["audio"]["sampling_rate"]
+
+                                    # Rééchantillonnage automatique si différent de 16kHz
+                                    if sr != 16000:
+                                        arr = librosa.resample(arr, orig_sr=sr, target_sr=16000)
+                                        sr = 16000
+
+                                    # Tronquage des longs audios (>30 secondes)
+                                    if len(arr) > MAX_LEN:
+                                        arr = arr[:MAX_LEN]
+
+                                    clean_audio_data.append({
+                                        "audio": {
+                                            "path": item["audio"]["path"],
+                                            "array": arr.astype(np.float32),
+                                            "sampling_rate": sr
+                                        },
+                                        "file": item["file"]
+                                    })
+
+                                st.info(f"✅ Nettoyage audio terminé : {len(clean_audio_data)} fichiers prêts pour HF Datasets")
+
+                                # Créer le dataset de test avec les données nettoyées
+                                from datasets import Dataset
+
+                                ds = Dataset.from_list(clean_audio_data)
+
+                                st.success(f"🎧 Dataset de test créé avec {len(ds)} fichiers !")
+                                st.info("✅ Test réussi - réessayez avec plus de fichiers ou utilisez la conversion automatique")
+                            else:
+                                st.error("❌ Même avec 5 fichiers, le chargement échoue")
+                        except Exception as test_error:
+                            st.error(f"❌ Échec du test : {str(test_error)}")
+
+                    st.stop()
+
+        except Exception as e:
+            st.error(f"❌ Erreur lors du chargement du dataset : {str(e)}")
+            st.error("**Détails techniques :**")
+            st.code(str(e))
+
+            # Diagnostic avancé
+            st.error("### 🔍 Diagnostic du problème :")
+
+            # Vérifier les formats de fichiers
+            supported_formats = ['.wav', '.mp3', '.flac', '.aac', '.ogg', '.m4a', '.aiff', '.au']
+            found_formats = set()
+
+            for root, dirs, files in os.walk(audio_folder):
+                for f in files:
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in supported_formats:
+                        found_formats.add(ext)
+
+            if found_formats:
+                st.info(f"📋 Formats audio détectés : {', '.join(found_formats)}")
+            else:
+                st.error("❌ Aucun format audio supporté trouvé")
+
+            # Lister quelques fichiers pour debug
+            all_files = []
+            for root, dirs, files in os.walk(audio_folder):
+                for f in files:
+                    all_files.append(os.path.join(root, f))
+
+            st.error("📁 Fichiers dans le dossier (échantillon) :")
+            for f in all_files[:10]:  # Montrer max 10 fichiers
+                file_size = os.path.getsize(f) if os.path.exists(f) else 0
+                st.error(f"  - {os.path.basename(f)} ({file_size} bytes)")
+
+            if len(all_files) > 10:
+                st.error(f"  ... et {len(all_files) - 10} autres fichiers")
+
+            st.error("### 💡 Solutions recommandées :")
+            st.error("1. **Formats supportés** : WAV, MP3, FLAC, AAC, OGG, M4A, AIFF, AU")
+            st.error("2. **Fichiers corrompus** : Vérifiez que vos fichiers audio ne sont pas corrompus")
+            st.error("3. **Métadonnées ID3** : Les fichiers MP3 avec tags ID3 corrompus sont automatiquement nettoyés")
+            st.error("4. **Taille des fichiers** : Évitez les fichiers trop volumineux (>500MB)")
+            st.error("5. **Structure du ZIP** : Assurez-vous que les fichiers audio sont directement dans un dossier")
+            st.error("6. **Réessayer** : Téléchargez un nouveau ZIP avec des fichiers audio valides")
+
+            # Bouton pour afficher plus de détails
+            if st.button("🔧 Afficher les détails complets du dossier"):
+                st.error("### 📂 Contenu complet du dossier :")
+                for root, dirs, files in os.walk(audio_folder):
+                    level = root.replace(audio_folder, '').count(os.sep)
+                    indent = ' ' * 2 * level
+                    st.error(f"{indent}📁 {os.path.basename(root)}/")
+                    subindent = ' ' * 2 * (level + 1)
+                    for f in files[:5]:  # Max 5 fichiers par dossier
+                        st.error(f"{subindent}📄 {f}")
+                    if len(files) > 5:
+                        st.error(f"{subindent}... et {len(files) - 5} autres")
+
+            st.stop()
+
+        # -----------------------------------------
+        # 3) CHOIX D’UN FICHIER À EXPLORER
+        # -----------------------------------------
+        index = st.slider("Sélectionner un fichier :", 0, len(ds) - 1, 0)
+        ex = ds[index]
+
+        st.subheader(f"🎵 Fichier audio #{index}")
+
+        # Charger correctement le fichier audio depuis le disque avec soundfile
+        import soundfile as sf
+        audio_path = ex["audio"]["path"]
+        y_plot, sr_plot = sf.read(audio_path)
+
+        # Si stéréo → convertir en mono
+        if len(y_plot.shape) > 1:
+            y_plot = librosa.to_mono(y_plot.T)
+
+        # Convertir en float32 si nécessaire
+        y_plot = y_plot.astype("float32")
+
+        # Player audio
+        import numpy as np
+        audio_array = np.array(y_plot) if not isinstance(y_plot, np.ndarray) else y_plot
+        st.audio(audio_array, sample_rate=sr_plot)
+
+        # -----------------------------------------
+        # 4) ANALYSE – Forme d’onde
+        # -----------------------------------------
+        # y_plot et sr_plot sont déjà définis ci-dessus depuis les données nettoyées
+
+        fig_wave, ax = plt.subplots(figsize=(10, 3))
+        librosa.display.waveshow(y_plot, sr=sr_plot, ax=ax)
+        ax.set_title("Forme d’onde")
+        st.pyplot(fig_wave)
+
+        # -----------------------------------------
+        # 5) ANALYSE – Spectrogramme Mel
+        # -----------------------------------------
+        st.subheader("🎼 Spectrogramme Mel")
+
+        S = librosa.feature.melspectrogram(y=y_plot, sr=sr_plot, n_mels=128)
+        S_db = librosa.power_to_db(S, ref=np.max)
+
+        fig_mel, ax = plt.subplots(figsize=(10, 4))
+        img = librosa.display.specshow(S_db, sr=sr_plot, x_axis="time", y_axis="mel", ax=ax)
+        ax.set_title("Mel-Spectrogramme")
+        fig_mel.colorbar(img, ax=ax, format="%+2.f dB")
+        st.pyplot(fig_mel)
+
+        # -----------------------------------------
+        # 6) MÉTADONNÉES
+        # -----------------------------------------
+        st.subheader("📊 Métadonnées")
+
+        duration = len(y_plot) / sr_plot  # Calcul direct depuis les données chargées
+        st.write(f"- Durée : **{duration:.2f} sec** (tronquée à 30s max si nécessaire)")
+        st.write(f"- Fréquence d'échantillonnage : **{sr_plot} Hz**")
+        st.write(f"- Taille du tableau : **{len(y_plot)} échantillons**")
+        st.write(f"- Chemin du fichier : **{audio_path}**")
 elif mode == "🧠 Entraînement IA":
     st.header("🧠 Entraîner IA multimodaux")
 
@@ -3402,14 +4309,14 @@ elif mode == "🧪 Test du Modèle":
             else:
                 st.error("⚠️ Base RAG vidéo non trouvée. Importez d'abord des vidéos.")
 elif mode == "🤖 LLM Agent":
-    st.header("🤖 Agent IA - Mistral 7B")
+    st.header("🤖 Agent IA - Phi-2")
 
-    with st.expander("🧠 Guide de l'Agent Mistral"):
+    with st.expander("🧠 Guide de l'Agent Phi"):
         st.markdown("""
-        ## 🤖 Agent IA Multimodal - Mistral 7B
+        ## 🤖 Agent IA Multimodal - Phi-2
 
         ### 🎯 **Rôle de l'Agent**
-        L'agent Mistral est un modèle de langage avancé qui peut :
+        L'agent Phi est un modèle de langage avancé qui peut :
         - **Analyser** les performances des autres modèles
         - **Fournir des insights** sur les résultats de test
         - **Suggérer des améliorations** pour vos modèles
@@ -3422,13 +4329,13 @@ elif mode == "🤖 LLM Agent":
         - **Rapports d'expertise** IA
 
         ### 🔧 **Configuration Technique**
-        - **Modèle :** Mistral-7B-Instruct-v0.2
+        - **Modèle :** Phi-2
         - **Quantization :** 4-bit NF4 (réduit à ~4GB)
         - **Contexte :** 4096 tokens
         - **Température :** 0.3 (pour analyses précises)
 
         ### 💡 **Comment utiliser**
-        1. **Téléchargez** d'abord le modèle Mistral
+        1. **Téléchargez** d'abord le modèle Phi
         2. **Testez** vos modèles dans l'onglet "🧪 Test du Modèle"
         3. **Demandez** à l'agent d'analyser les résultats
         4. **Recevez** un rapport d'expertise détaillé
@@ -3440,12 +4347,12 @@ elif mode == "🤖 LLM Agent":
         """)
 
     # Section téléchargement
-    st.subheader("📥 Téléchargement du modèle Mistral")
+    st.subheader("📥 Téléchargement du modèle Phi")
 
     # Vérifier si le modèle est disponible localement
     try:
         from transformers import AutoModelForCausalLM
-        AutoModelForCausalLM.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2", local_files_only=True)
+        AutoModelForCausalLM.from_pretrained("microsoft/phi-2", local_files_only=True)
         model_exists = True
         model_path_display = "Cache HuggingFace (complet)"
     except:
@@ -3453,14 +4360,14 @@ elif mode == "🤖 LLM Agent":
         model_path_display = "Cache HuggingFace (incomplet - téléchargement nécessaire)"
 
     if model_exists:
-        st.success("✅ Modèle Mistral-7B déjà disponible!")
+        st.success("✅ Modèle Phi-2 déjà disponible!")
         st.info(f"📍 Localisation: {model_path_display}")
     else:
-        st.warning("⚠️ Modèle Mistral-7B non trouvé.")
+        st.warning("⚠️ Modèle Phi-2 non trouvé.")
         st.info("Le modèle sera téléchargé depuis HuggingFace (nécessite ~4GB d'espace disque)")
 
-        if st.button("🚀 Télécharger Mistral-7B (4GB)", type="primary"):
-            success = download_mistral_model()
+        if st.button("🚀 Télécharger Phi-2 (2.5GB)", type="primary"):
+            success = download_phi_model()
             if success:
                 st.success("🎉 Téléchargement réussi! Le modèle est prêt.")
                 st.rerun()
@@ -3471,16 +4378,16 @@ elif mode == "🤖 LLM Agent":
     st.subheader("🧠 Utilisation de l'Agent IA")
 
     if not model_exists:
-        st.warning("💡 Téléchargez d'abord le modèle Mistral pour utiliser l'agent.")
+        st.warning("💡 Téléchargez d'abord le modèle Phi pour utiliser l'agent.")
     else:
         # Charger le modèle
-        with st.spinner("🔄 Chargement de Mistral-7B..."):
-            pipe_result = get_mistral_pipe_lazy()
+        with st.spinner("🔄 Chargement de Phi-2..."):
+            pipe_result = get_phi_pipe_lazy()
 
         if pipe_result and len(pipe_result) == 2:
-            mistral_pipe, mistral_tokenizer = pipe_result
-            st.success("✅ Agent Mistral chargé et prêt!")
-            st.success("✅ Agent Mistral chargé et prêt!")
+            phi_pipe, phi_tokenizer = pipe_result
+            st.success("✅ Agent Phi chargé et prêt!")
+            st.success("✅ Agent Phi chargé et prêt!")
 
             # Options d'utilisation
             agent_mode = st.selectbox(
@@ -3489,7 +4396,7 @@ elif mode == "🤖 LLM Agent":
             )
 
             if agent_mode == "Chat libre":
-                st.markdown("### 💬 Chat avec Mistral")
+                st.markdown("### 💬 Chat avec Phi")
 
                 user_input = st.text_area(
                     "Posez votre question à l'agent IA :",
@@ -3551,7 +4458,7 @@ elif mode == "🤖 LLM Agent":
                                     else:
                                         st.warning("⚠️ Aucun contenu exploitable trouvé dans les PDFs.")
 
-                                # Générer une réponse avec Mistral sur les PDFs téléchargés
+                                # Générer une réponse avec Phi sur les PDFs téléchargés
                                 # Limiter à 10 PDFs maximum pour éviter les dépassements de contexte
                                 max_pdfs_for_analysis = 10
                                 pdfs_to_analyze = downloaded_pdfs[:max_pdfs_for_analysis]
@@ -3571,7 +4478,7 @@ elif mode == "🤖 LLM Agent":
 
                                 # Vérifier la longueur du prompt avant l'inférence
                                 prompt_length = len(pdf_summary_prompt.split())
-                                max_context_length = 4000  # Laisser une marge sous les 4096 tokens de Mistral
+                                max_context_length = 4000  # Laisser une marge sous les 4096 tokens de Phi
                                 
                                 if prompt_length > max_context_length:
                                     st.warning(f"⚠️ Prompt trop long ({prompt_length} mots). Troncature en cours...")
@@ -3587,8 +4494,8 @@ elif mode == "🤖 LLM Agent":
                                     Fournis un résumé utile de ces documents et explique comment ils pourraient être utiles pour créer des modèles d'IA.
                                     """
 
-                                with st.spinner("🤖 Mistral analyse les PDFs téléchargés..."):
-                                    pdf_analysis = get_mistral_pipe_lazy()[0](
+                                with st.spinner("🤖 Phi analyse les PDFs téléchargés..."):
+                                    pdf_analysis = get_phi_pipe_lazy()[0](
                                         pdf_summary_prompt,
                                         max_new_tokens=1024,
                                         do_sample=True,
@@ -3596,15 +4503,15 @@ elif mode == "🤖 LLM Agent":
                                         top_p=0.9
                                     )[0]['generated_text']
 
-                                st.markdown("### 🤖 Analyse Mistral des PDFs:")
+                                st.markdown("### 🤖 Analyse Phi des PDFs:")
                                 st.markdown(pdf_analysis.replace(pdf_summary_prompt, "").strip())
 
                             else:
                                 st.warning("⚠️ Aucun PDF trouvé pour cette requête. Essaie avec des termes plus spécifiques.")
 
-                                # Réponse normale de Mistral si aucun PDF trouvé
-                                with st.spinner("🤖 Mistral réfléchit..."):
-                                    response = get_mistral_pipe_lazy()[0](
+                                # Réponse normale de Phi si aucun PDF trouvé
+                                with st.spinner("🤖 Phi réfléchit..."):
+                                    response = get_phi_pipe_lazy()[0](
                                         user_input,
                                         max_new_tokens=1024,
                                         do_sample=True,
@@ -3612,12 +4519,12 @@ elif mode == "🤖 LLM Agent":
                                         top_p=0.95
                                     )[0]['generated_text']
 
-                                st.markdown("### 🤖 Réponse de l'Agent Mistral:")
+                                st.markdown("### 🤖 Réponse de l'Agent Phi:")
                                 st.markdown(response.replace(user_input, "").strip())
                         else:
-                            # Réponse normale de Mistral
-                            with st.spinner("🤖 Mistral réfléchit..."):
-                                response = get_mistral_pipe_lazy()[0](
+                            # Réponse normale de Phi
+                            with st.spinner("🤖 Phi réfléchit..."):
+                                response = get_phi_pipe_lazy()[0](
                                     user_input,
                                     max_new_tokens=1024,
                                     do_sample=True,
@@ -3625,7 +4532,7 @@ elif mode == "🤖 LLM Agent":
                                     top_p=0.95
                                 )[0]['generated_text']
 
-                            st.markdown("### 🤖 Réponse de l'Agent Mistral:")
+                            st.markdown("### 🤖 Réponse de l'Agent Phi:")
                             st.markdown(response.replace(user_input, "").strip())
                     else:
                         st.warning("Veuillez entrer une question.")
@@ -3673,9 +4580,9 @@ elif mode == "🤖 LLM Agent":
                         height=80
                     )
 
-                    if st.button("🔬 Analyser avec Mistral", type="primary"):
-                        analysis = mistral_agent_test(selected_model, test_results, context)
-                        st.markdown("### 📊 Analyse de l'Agent Mistral:")
+                    if st.button("🔬 Analyser avec Phi", type="primary"):
+                        analysis = phi_agent_test(selected_model, test_results, context)
+                        st.markdown("### 📊 Analyse de l'Agent Phi:")
                         st.markdown(analysis)
                 else:
                     st.warning("Aucun modèle entraîné trouvé. Entraînez d'abord des modèles.")
@@ -3726,7 +4633,7 @@ elif mode == "🤖 LLM Agent":
                     """
 
                     with st.spinner("📄 Génération du rapport d'expertise..."):
-                        report = get_mistral_pipe_lazy()[0](
+                        report = get_phi_pipe_lazy()[0](
                             report_prompt,
                             max_new_tokens=2048,
                             do_sample=True,
@@ -3734,7 +4641,7 @@ elif mode == "🤖 LLM Agent":
                             top_p=0.9
                         )[0]['generated_text']
 
-                    st.markdown("### 📋 Rapport d'Expertise - Agent Mistral")
+                    st.markdown("### 📋 Rapport d'Expertise - Agent Phi")
                     st.markdown(report.replace(report_prompt, "").strip())
 
                     # Option de téléchargement
@@ -3742,11 +4649,11 @@ elif mode == "🤖 LLM Agent":
                     st.download_button(
                         label="💾 Télécharger le rapport",
                         data=report_text,
-                        file_name="rapport_expertise_mistral.txt",
+                        file_name="rapport_expertise_phi.txt",
                         mime="text/plain"
                     )
         else:
-            st.error("❌ Impossible de charger l'agent Mistral. Vérifiez les logs.")
+            st.error("❌ Impossible de charger l'agent Phi. Vérifiez les logs.")
 elif mode == "🤖 LeRobot Agent":
     st.header("🤖 Agent Robotique - LeRobot")
 
@@ -3791,13 +4698,30 @@ elif mode == "🤖 LeRobot Agent":
         # Section téléchargement
         st.subheader("📥 Téléchargement des modèles LeRobot")
 
+        # Options d'optimisation mémoire
+        st.markdown("### 🔧 Options d'optimisation mémoire")
+        use_light_model = st.checkbox("Utiliser modèle léger (moins de mémoire)", value=True)
+        force_cpu = st.checkbox("Forcer utilisation CPU (évite OOM)", value=False)
+
         available_models = [
-            "lerobot/act_aloha_sim_transfer_cube_human",
-            "lerobot/act_aloha_sim_insertion_human",
-            "lerobot/pi0_base"
+            "lerobot/act_aloha_sim_transfer_cube_human",  # ~2-3GB
+            "lerobot/act_aloha_sim_insertion_human",      # ~2-3GB
+            "lerobot/pi0_base"                            # Plus léger
         ]
 
+        # Filtrer les modèles selon l'option légère
+        if use_light_model:
+            available_models = [m for m in available_models if "pi0" in m or "base" in m]
+            if not available_models:
+                available_models = ["lerobot/pi0_base"]  # Modèle par défaut léger
+
         selected_lerobot_model = st.selectbox("Modèle LeRobot :", available_models)
+
+        if use_light_model:
+            st.info("🔧 Mode léger activé - Utilisation de modèles optimisés pour la mémoire")
+
+        lerobot_path = os.path.join(ROBOTICS_DIR, selected_lerobot_model.replace("/", "_"))
+        lerobot_exists = os.path.exists(lerobot_path)
 
         lerobot_path = os.path.join(ROBOTICS_DIR, selected_lerobot_model.replace("/", "_"))
         lerobot_exists = os.path.exists(lerobot_path)
@@ -3821,12 +4745,24 @@ elif mode == "🤖 LeRobot Agent":
         if not lerobot_exists:
             st.warning("💡 Téléchargez d'abord un modèle LeRobot.")
         else:
-            # Charger le modèle LeRobot
+            # Charger le modèle LeRobot avec les options choisies
             with st.spinner("🔄 Chargement du modèle LeRobot..."):
+                # Passer les options d'optimisation à la fonction de chargement
                 lerobot_policy = load_lerobot_model(selected_lerobot_model)
+
+                # Forcer CPU si demandé
+                if force_cpu and lerobot_policy:
+                    lerobot_policy.to(torch.device('cpu'))
+                    st.info("💻 Modèle forcé sur CPU")
 
             if lerobot_policy:
                 st.success("✅ Modèle LeRobot chargé!")
+
+                # Informations sur l'utilisation mémoire
+                if torch.cuda.is_available():
+                    memory_info = torch.cuda.mem_get_info()
+                    free_memory = memory_info[0] / 1024**3
+                    st.info(f"🧠 Mémoire GPU disponible: {free_memory:.1f}GB")
 
                 # Sélection du modèle de vision à tester
                 vision_models = []
@@ -3853,60 +4789,57 @@ elif mode == "🤖 LeRobot Agent":
                         st.image(test_image_path, caption="Image de test", width=300)
 
                         if st.button("🦾 Tester avec LeRobot", type="primary"):
-                            with st.spinner("🤖 Test robotique en cours..."):
-                                results = lerobot_test_vision_model(vision_path, lerobot_policy, test_image_path)
+                            try:
+                                with st.spinner("🤖 Test robotique en cours..."):
+                                    results = lerobot_test_vision_model(vision_path, lerobot_policy, test_image_path)
 
-                            if isinstance(results, dict):
-                                st.success("✅ Test robotique réussi!")
+                                if isinstance(results, dict):
+                                    st.success("✅ Test robotique réussi!")
 
-                                st.markdown("### 📊 Résultats du Test Robotique")
+                                    st.markdown("### 📊 Résultats du Test Robotique")
 
-                                col1, col2 = st.columns(2)
+                                    col1, col2 = st.columns(2)
 
-                                with col1:
-                                    st.markdown("**Détections Vision :**")
-                                    if results["vision_detections"]:
-                                        for i, det in enumerate(results["vision_detections"][:5]):  # Max 5
-                                            st.write(f"• Détection {i+1}: {det}")
-                                    else:
-                                        st.write("Aucune détection")
+                                    with col1:
+                                        st.markdown("**Détections Vision :**")
+                                        if results["vision_detections"]:
+                                            for i, det in enumerate(results["vision_detections"][:5]):  # Max 5
+                                                st.write(f"• Détection {i+1}: {det}")
+                                        else:
+                                            st.write("Aucune détection")
 
-                                with col2:
-                                    st.markdown("**Action Robotique :**")
-                                    st.write(str(results["lerobot_action"])[:500] + "..." if len(str(results["lerobot_action"])) > 500 else str(results["lerobot_action"]))
+                                    with col2:
+                                        st.markdown("**Action Robotique :**")
+                                        action_str = str(results["lerobot_action"])[:500]
+                                        if len(str(results["lerobot_action"])) > 500:
+                                            action_str += "..."
+                                        st.write(action_str)
 
-                                st.markdown("### 🤖 Évaluation LeRobot")
-                                st.markdown(results["evaluation"])
+                                    st.markdown("### 🤖 Évaluation LeRobot")
+                                    st.markdown(results["evaluation"])
 
-                                # Intégration avec Mistral pour analyse
-                                if st.button("🔬 Analyser avec Mistral", type="secondary"):
-                                    analysis_prompt = f"""
-                                    Analyse ces résultats de test robotique intégrant vision et action :
+                                else:
+                                    st.error(f"❌ Erreur test: {results}")
 
-                                    Détections vision: {results['vision_detections']}
-                                    Action robotique: {results['lerobot_action']}
-                                    Évaluation: {results['evaluation']}
+                            except RuntimeError as cuda_error:
+                                if "out of memory" in str(cuda_error).lower():
+                                    st.error("🚨 Erreur CUDA Out of Memory!")
+                                    st.error("### 💡 Solutions immédiates :")
+                                    st.error("1. **Activez 'Forcer utilisation CPU'** ci-dessus")
+                                    st.error("2. **Cochez 'Utiliser modèle léger'** pour des modèles plus petits")
+                                    st.error("3. **Cliquez 'Optimiser Mémoire GPU'** dans la sidebar")
+                                    st.error("4. **Redémarrez l'application** pour nettoyer la mémoire")
 
-                                    Fournis une analyse détaillée de l'intégration vision-robotique.
-                                    """
-
-                                    mistral_pipe, _ = get_mistral_pipe_lazy()
-                                    if mistral_pipe:
-                                        with st.spinner("🤖 Mistral analyse..."):
-                                            analysis = get_mistral_pipe_lazy()[0](
-                                                analysis_prompt,
-                                                max_new_tokens=1024,
-                                                do_sample=True,
-                                                temperature=0.3,
-                                                top_p=0.9
-                                            )[0]['generated_text']
-
-                                        st.markdown("### 📋 Analyse Mistral:")
-                                        st.markdown(analysis.replace(analysis_prompt, "").strip())
-                                    else:
-                                        st.warning("Agent Mistral non disponible pour l'analyse.")
-                            else:
-                                st.error(f"❌ Erreur: {results}")
+                                    # Bouton de récupération automatique
+                                    if st.button("🔧 Récupération automatique", type="primary"):
+                                        # Forcer CPU et recharger
+                                        lerobot_policy.to(torch.device('cpu'))
+                                        st.success("✅ Modèle basculé sur CPU - Réessayez le test")
+                                        st.rerun()
+                                else:
+                                    st.error(f"Erreur CUDA: {str(cuda_error)}")
+                            except Exception as test_error:
+                                st.error(f"Erreur test robotique: {str(test_error)}")
                 else:
                     st.warning("Aucun modèle de vision trouvé. Entraînez d'abord un modèle vision.")
             else:
@@ -4169,7 +5102,7 @@ elif mode == "🚀 Serveur API Robot":
 
     api_models = {
         "Vision": ["vision_yolo_trained", "vision_yolo_default"],
-        "Language": ["language_transformers", "language_mistral"],
+        "Language": ["language_transformers", "language_phi"],
         "Audio": ["audio_pytorch"],
         "Robotics": ["robotics_aloha_cube", "robotics_aloha_insertion"]
     }
@@ -4181,7 +5114,7 @@ elif mode == "🚀 Serveur API Robot":
             if "vision" in model:
                 model_path = os.path.join(MODEL_DIR, "vision_model/weights/best.pt") if "trained" in model else "yolov8n.pt"
             elif "language" in model:
-                model_path = os.path.join(MODEL_DIR, "language_model") if "transformers" in model else "mistralai/Mistral-7B-Instruct-v0.2"
+                model_path = os.path.join(MODEL_DIR, "language_model") if "transformers" in model else "microsoft/phi-2"
             elif "audio" in model:
                 model_path = os.path.join(MODEL_DIR, "audio_model.pt")
             elif "robotics" in model:
@@ -4201,7 +5134,7 @@ elif mode == "🧠 Agent LangChain Multimodal":
         st.markdown("""
         ## 🤖 Agent LangChain Multimodal
 
-        ### 🧠 **LLM Central - Mistral 7B**
+        ### 🧠 **LLM Central - Phi-2**
         - Modèle de langage avancé pour le raisonnement
         - Orchestration intelligente des outils
         - Génération de réponses contextuelles
@@ -4220,7 +5153,7 @@ elif mode == "🧠 Agent LangChain Multimodal":
 
         #### 🗣️ **Language Processing Tool**
         - `language_processor`: Analyse, traduction, résumé de texte
-        - Support multilingue (9 langues) avec Mistral
+        - Support multilingue (9 langues) avec Phi
         - Classification et génération de contenu
 
         #### 🦾 **Robotics Tool**
@@ -4234,7 +5167,7 @@ elif mode == "🧠 Agent LangChain Multimodal":
         - Analyse et résumé de contenu PDF
 
         ### 🔄 **Workflow d'Exécution**
-        1. **Analyse de la requête** par Mistral
+        1. **Analyse de la requête** par Phi
         2. **Sélection automatique** des outils appropriés
         3. **Orchestration séquentielle** des tâches
         4. **Synthèse des résultats** en réponse cohérente
@@ -4258,10 +5191,10 @@ elif mode == "🧠 Agent LangChain Multimodal":
         st.metric("🛠️ Outils Disponibles", tools_count)
 
     with col3:
-        # Vérifier si Mistral est chargé
+        # Vérifier si Phi est chargé
         try:
-            pipe_result = get_mistral_pipe_lazy()
-            llm_status = "✅ Mistral-7B" if pipe_result and len(pipe_result) == 2 else "❌ Non chargé"
+            pipe_result = get_phi_pipe_lazy()
+            llm_status = "✅ Phi-2" if pipe_result and len(pipe_result) == 2 else "❌ Non chargé"
         except:
             llm_status = "❌ Non chargé"
         st.metric("🤖 LLM", llm_status)
@@ -4319,7 +5252,7 @@ elif mode == "🧠 Agent LangChain Multimodal":
                         st.error(error_msg)
                         st.session_state.langchain_messages.append({"role": "assistant", "content": error_msg})
             else:
-                error_msg = "❌ Agent LangChain non disponible. Vérifiez que Mistral est chargé."
+                error_msg = "❌ Agent LangChain non disponible. Vérifiez que Phi est chargé."
                 st.error(error_msg)
                 st.session_state.langchain_messages.append({"role": "assistant", "content": error_msg})
 
@@ -4622,7 +5555,7 @@ elif mode == "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025":
         pdf_count = len(glob.glob(f"{BASE_DIR}/pdfs/*.pdf")) if os.path.exists(f"{BASE_DIR}/pdfs") else 0
         st.metric("PDFs techniques téléchargés", f"{pdf_count}", "via RAG académique")
         caption_count = len(glob.glob(f"{IMAGES_DIR}/*.txt"))
-        st.metric("Captions générées par Mistral", f"{caption_count}", "qualité pro")
+        st.metric("Captions générées par Phi", f"{caption_count}", "qualité pro")
     with col3:
         st.video("https://www.youtube.com/embed/dQw4w9WgXcQ")  # Placeholder video
 
@@ -4700,16 +5633,16 @@ elif mode == "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025":
     if st.button("2. 🎯 Captionneur Aérodynamique Gabonais (le meilleur du monde)"):
         # Vérifier si le modèle est chargé
         try:
-            pipe_result = get_mistral_pipe_lazy()
+            pipe_result = get_phi_pipe_lazy()
             model_ready = pipe_result and len(pipe_result) == 2
         except:
             model_ready = False
 
         if not model_ready:
-            st.error("❌ Chargez d'abord le modèle Mistral dans l'onglet LLM Agent")
+            st.error("❌ Chargez d'abord le modèle Phi dans l'onglet LLM Agent")
         else:
-            mistral_pipe, mistral_tokenizer = pipe_result
-            with st.spinner("Mistral devient ingénieur Le Mans…"):
+            phi_pipe, phi_tokenizer = pipe_result
+            with st.spinner("Phi devient ingénieur Le Mans…"):
                 vision_tool = VisionAnalysisTool()
                 processed = 0
                 for img_path in glob.glob(f"{IMAGES_DIR}/*.png")[:500]:
@@ -4720,7 +5653,7 @@ elif mode == "🇬🇦 Gabon Edition – Le Meilleur Labo IA du Monde 2025":
                         Style Danbooru + détails techniques extrêmes.
                         Image: {vision}
                         Caption:"""
-                        result = mistral_pipe(prompt, max_new_tokens=220)[0]['generated_text']
+                        result = phi_pipe(prompt, max_new_tokens=220)[0]['generated_text']
                         caption = result.split("Caption:")[-1].strip() if "Caption:" in result else result
                         with open(img_path.replace(".png", ".txt"), "w") as f:
                             f.write(caption)
