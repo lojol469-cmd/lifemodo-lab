@@ -167,15 +167,16 @@ logo_path = os.path.join(BASE_DIR, "logo.svg")
 if os.path.exists(logo_path):
     col_logo, col_title = st.columns([1, 5])
     with col_logo:
-        with open(logo_path, "r") as f:
+        with open(logo_path, "r", encoding="utf-8") as f:
             logo_svg = f.read()
-        st.markdown(f'<div style="text-align: center;">{logo_svg}</div>', unsafe_allow_html=True)
+        # Redimensionner le SVG pour l'affichage
+        logo_svg = logo_svg.replace('width="200"', 'width="80"').replace('height="200"', 'height="80"')
+        st.markdown(logo_svg, unsafe_allow_html=True)
     with col_title:
-        st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
-        st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab) • [Landing Page](landing_page.html)")
+        st.title("🧬 LifeModo AI Lab v2.0")
+        st.caption("*Le Premier Laboratoire IA avec Mode Séparé par Document*")
 else:
     st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
-    st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab)")
 
 # Gestion de l'état
 if os.path.exists(STATUS_FILE):
