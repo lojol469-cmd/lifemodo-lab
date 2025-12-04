@@ -162,21 +162,14 @@ else:
 
 st.set_page_config(page_title="LifeModo AI Lab Multimodal v2.0", layout="wide", page_icon="🧬")
 
-# Afficher le logo en haut
-logo_path = os.path.join(BASE_DIR, "logo_simple.svg")
-if os.path.exists(logo_path):
-    col_logo, col_title = st.columns([1, 5])
-    with col_logo:
-        with open(logo_path, "r", encoding="utf-8") as f:
-            logo_svg = f.read()
-        # Redimensionner le SVG pour l'affichage
-        logo_svg = logo_svg.replace('width="200"', 'width="100"').replace('height="200"', 'height="100"')
-        st.markdown(logo_svg, unsafe_allow_html=True)
-    with col_title:
-        st.title("🧬 LifeModo AI Lab v2.0")
-        st.caption("*Le Premier Laboratoire IA avec Mode Séparé par Document*")
-else:
-    st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
+# Header avec émojis
+st.markdown("""
+<div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin-bottom: 20px;'>
+    <h1 style='color: white; margin: 0; font-size: 3em;'>🧬 LifeModo AI Lab v2.0</h1>
+    <p style='color: #f0f0f0; margin: 10px 0 0 0; font-size: 1.2em;'>Le Premier Laboratoire IA avec Mode Séparé par Document</p>
+    <p style='color: #e0e0e0; margin: 5px 0 0 0;'>🧠 Vision • 💬 LLM • 🎵 Audio • 📊 Multimodal</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Gestion de l'état
 if os.path.exists(STATUS_FILE):
