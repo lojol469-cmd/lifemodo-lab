@@ -1,39 +1,23 @@
-48
-L E  TO U R  D E S  G R A N D S  L AC S  A L P I N S  N AT U R E L S  E N  8 0  Q U E S T I O N S
-Les eaux des lacs sont de couleurs très changeantes : elles sont en général bleues, mais leurs 
-couleurs peuvent varier du turquoise transparent au vert, au marron ou plus exceptionnellement 
-au rouge. La couleur des eaux est la combinaison de la couleur même de l’eau pure, des 
-substances dissoutes et des propriétés optiques des particules présentes.
-L’alchimie de la couleur
-L’eau pure, lorsqu’elle est observée sur une faible épaisseur, apparaît transparente et incolore mais elle devient de 
-plus en plus bleue lorsque la couche d’eau observée s’épaissit. Cette couleur bleue est causée par la différence 
-d’absorption, par les molécules d’eau, des longueurs d’ondes de la lumière visible (le rouge est absorbé en premier, 
-puis le jaune, le vert et enfin le bleu).
-Ce sont par contre les particules associées 
-à 
-l’eau 
-(algues 
-microscopiques, 
-grains 
-de calcaire, particules organiques…) qui 
-permettent la réflexion et la modification de 
-la lumière incidente. La présence de ces 
-particules explique que les eaux des lacs 
-reflètent la couleur du ciel, tandis que leur 
-quantité et leur nature (ou « turbidité ») limitent 
-sa transparence et en modifient sa couleur.
-La couleur bleu-vert des lacs, comme celui 
-d’Aiguebelette en été, provient de la trans-
-formation du calcaire dissous, naturellement 
-présent en quantité importante dans ses eaux, 
-en petites particules. Des épisodes de très fort 
-biologie e t écologie
-2-08 À quoi est due la couleur  
-des eaux d’un lac ?
- 
-
-Marie-Elodie Perga et Orlane Anneville, INRA CARRTEL • Michel Lafforgue, SAFEGE •
-Photo 2 – La gamme de couleur de Forel, créée en 1890 par F.-A. Forel, père de la limnologie, 
-est une échelle de tons reflétant la diversité de la couleur des eaux des lacs alpins 
-(© ETH Productions)
-Photo 1 – Le lac du Bourget jaune en septembre 2014 lors de l’efflorescence de microsystis (© CISALB)
+ 
+GUIDE Word 2013 (version débutante) 
+- 18 - 
+Marie-Josée Tondreau 
+Conseillère pédagogique TIC 
+819 762-0931 poste 1489 
+mariejosee.tondreau@cegepat.qc.ca 
+14. Compter les mots 
+Word actualise en permanence le nombre de mots du document dans la barre d’état.  
+ 
+ 
+Vous pouvez avoir plus d’informations statistiques sur votre document. Dans le ruban 
+« Révision »  
+ 
+ 
+15. Insertion 
+Date et heure 
+Cliquez à l’endroit où insérer la date ou l’heure. Dans le ruban « Insertion », cliquez sur 
+« Date et heure ».  
+En activant cette option, 
+vous demandez que la date 
+se modifie selon le 
+calendrier. 

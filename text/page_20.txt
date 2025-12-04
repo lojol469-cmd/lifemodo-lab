@@ -1,58 +1,20 @@
-50
-L E  TO U R  D E S  G R A N D S  L AC S  A L P I N S  N AT U R E L S  E N  8 0  Q U E S T I O N S
-Un écosystème lacustre est constitué par les organismes vivant dans le lac et leur environ-
-nement physico-chimique. L’écosystème représente donc un ensemble d’interactions existant 
-entre les espèces vivantes ainsi qu’entre ces espèces et les facteurs environnementaux. La 
-diversité et les rôles fonctionnels des espèces sont des éléments importants à prendre en 
-considération pour comprendre l’état et le fonctionnement d’un écosystème lacustre.
-De nombreuses interactions entre organismes régissent le fonctionnement  
-des écosystèmes
-Les principaux rôles fonctionnels classiquement exercés par les espèces au sein des écosystèmes sont des rôles 
-de producteurs, de consommateurs et de recycleurs des matières organiques et minérales. Ces fonctions 
-orchestrent la production biologique dans l’écosystème, notamment pour produire le stock piscicole. Le bon 
-équilibre entre ces différentes fonctions est un facteur clé dans l’état de qualité des lacs.
-Le schéma ci-contre (fig.1) permet de résumer les principales interactions qui existent en pleine eau (zone 
-pélagique). Il montre l’ensemble des chaînes alimentaires typiques (qui forment un réseau alimentaire) par lesquelles 
-l’énergie et la matière biologique circulent au sein du lac. On pourrait également adapter ce genre de schéma au 
-cas des berges avec les macrophytes (zones littorales) ou au cas des zones benthiques (fond du lac).
-Les transferts et le recyclage d’énergie et de matière
-Les transferts d’énergie et de matière entre les différents compartiments biologiques ne sont généralement pas 
-optimums et une grande partie est perdue sous forme d’excrétion et de restes des organismes dans le milieu 
-environnant. Une des conséquences liée à ces pertes est que plus on s’élève dans le réseau (on parle alors de 
-niveaux trophiques), moins les individus sont nombreux et moins la biomasse* est importante.
-Ces restes organiques ne sont pas perdus pour autant : ils sont utilisés par les décomposeurs (bactéries, 
-champignons) qui vont les recycler pour fournir à nouveau des éléments minéraux utilisables par les producteurs, 
-le phytoplancton en particulier. Ce recyclage s’opère dans la masse d’eau ou sur le fond du lac, où s’accumulent 
-les restes organiques par sédimentation.
-Cette capacité de recyclage naturel a ses limites. En effet, dans les situations où la production algale (dite 
-production primaire) est très forte (sous l’effet d’apports excessifs en éléments nutritifs, phosphore notamment, 
-dus à l’activité humaine), ni le transfert vers les maillons supérieurs de la chaine alimentaire ni le recyclage effectué 
-par les décomposeurs ne permettent de maintenir un flux de matière et d’énergie en équilibre : c’est ce qui se passe 
-lors des phénomènes d’eutrophisation par exemple.
-Un exemple concret
-Le schéma ci-contre (fig. 2) illustre deux cas qui 
-se sont présentés dans les grands lacs alpins. Il 
-y a le cas d’un lac pauvre en éléments nutritifs (dit 
-oligotrophe) et celui d’un lac dit mésotrophe ayant des 
-apports plus élevés en éléments nutritifs minéraux 
-(phosphore en particulier). Si le lac le plus riche en 
-éléments nutritifs permet de produire une quantité 
-plus grande de phytoplancton à la base de la chaine 
-alimentaire, cette ressource n’est pas forcément 
-bien transférée aux maillons supérieurs, du fait de 
-la présence d’espèces peu ou pas consommables, 
-notamment de grande taille. Par conséquent, le 
-bénéfice en terme de production piscicole pour ce 
-lac n’est pas très bon, et le transfert peu efficace 
-donne lieu à de nombreux restes dans le milieu (associés à des eaux de qualité médiocre à mauvaise).
-À l’inverse, un lac ayant une production phytoplanctonique moindre (car avec moins de ressources en éléments 
-nutritifs au départ dans le lac et caractérisé par un cortège d’espèces de bonne qualité nutritive et/ou plus petites) 
-peut avoir un bon rendement en termes de transferts et de production. Dans ce cas-là, même si la production piscicole 
-totale reste modérée, l’état de l’écosystème est très satisfaisant (transparence de l’eau, etc.).
-biologie e t écologie
-2-09 Qu’est-ce qu’un écosystème 
-lacustre ?
- 
-
-Stéphan Jacquet, Isabelle Domaizon, Marie-Elodie Perga, Rémy Tadonléké, INRA CARRTEL •
-Photo 1 – Le lac du Bourget (© S. Jacquet)
+ 
+GUIDE Word 2013 (version débutante) 
+- 20 - 
+Marie-Josée Tondreau 
+Conseillère pédagogique TIC 
+819 762-0931 poste 1489 
+mariejosee.tondreau@cegepat.qc.ca 
+16. Tableau 
+Pour insérer un tableau, positionnez-vous à l’endroit voulu. Dans le ruban « Insertion » 
+vous trouverez le bouton « Tableau ».  
+ 
+Vous pouvez également sélectionner des modèles prédéfinis. 
+ 
+ 
+Choisissez le nombre de 
+colonnes et le nombre de lignes. 
+Utilisez cette fonction lorsque vous 
+désirez un tableau plus grand. 
+Vous pouvez insérer un tableau Excel 
+avec cette fonction. 

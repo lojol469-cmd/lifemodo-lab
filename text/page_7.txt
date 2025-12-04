@@ -1,51 +1,26 @@
-Dans les grands lacs alpins, la richesse taxonomique répertoriée récemment est proche de 20 pour le lac d’Annecy 
-(à 55 m) et dans le Léman (à 200 m) alors qu’elle n’est que de 10 dans le lac du Bourget (à 96 m). Les différences 
-de richesse des peuplements profonds entre les lacs peuvent être interprétées en termes d’oxygénation des 
-sédiments. Dans le lac du Bourget, il semble que l’oxygénation de la zone profonde soit plus limitée que dans les 
-deux autres lacs, expliquant une plus faible diversité.
-Le nombre total d’espèces de macroinvertébrés benthiques des grands lacs alpins n’est pas connu. Toutefois, dans 
-le lac d’Annecy, une étude consacrée aux seuls chironomes (insectes, diptères) a répertorié 137 espèces, dont 
-certaines sont caractéristiques des lacs oligo-mésotrophes (pauvres en éléments nutritifs). 
-La diversité globale de l’ensemble des macroinvertébrés lacustres est donc probablement importante.
-Par rapport aux peuplements présents au début du xxe siècle, les 
-peuplements actuels sont appauvris en espèces emblématiques 
-des grands lacs peu productifs (oligotrophes) et sont enrichis 
-d’espèces exotiques comme les moules zébrées ou les 
-corbicules (voir question 2-07 : Les espèces invasives sont-
-elles dangereuses ?). Les peuplements de macroinvertébrés 
-benthiques témoignent encore des perturbations anciennes, 
-comme les pollutions des années 1970 et de l’existence de 
-conditions actuelles limitant le retour des espèces caractéristiques 
-des grands lacs oligotrophes. 
-Les conséquences du développement de l’ensemble des 
-espèces exotiques invasives sur celui des espèces natives 
-restent à approfondir.
-37
-L E  TO U R  D E S  G R A N D S  L AC S  A L P I N S  N AT U R E L S  E N  8 0  Q U E S T I O N S
-biologie e t écologie
-2
-Photos 5 à 7 – Quelques exemples de macroinvertébrés benthiques :
-Photo 5 – Aselle (© J.-F. Cart)
-Photo 6 – Dugesia (© J.-F. Cart)
-Photo 7 – Hydracarien (© J.-F. Cart)
-Des invertébrés nombreux et diversifiés se 
-développent dans ou à proximité du fond des 
-grands lacs et constituent une ressource 
-alimentaire importante pour les poissons 
-littoraux, mais également pour les poissons 
-pélagiques* comme les corégones et l’omble 
-chevalier. La végétation immergée, dont la 
-composition varie en fonction des lacs, joue un 
-rôle écologique majeur dans le fonctionnement 
-de l’écosystème.
-Ce qu’il faut retenir
-Macrophyte   Plante aquatique visible à l’œil nu.
-Biomasse   Masse totale des organismes végétaux et/ou animaux 
-contenus dans un milieu, à un instant donné.
-Taxon   Entité arbitraire qui regroupe des organismes vivants 
-possédant certains caractères communs. On l’assimile souvent à 
-l’espèce ou à une variété de l’espèce.
-7
-5
-6
-Pélagique   Vivant en pleine eau.
+ 
+GUIDE Word 2013 (version débutante) 
+- 7 - 
+Marie-Josée Tondreau 
+Conseillère pédagogique TIC 
+819 762-0931 poste 1489 
+mariejosee.tondreau@cegepat.qc.ca 
+7. Changer les caractères de la police 
+Pour modifier les caractères de la police, vous devez tout d’abord le sélectionner. Puis, 
+dans le ruban « Accueil », vous trouverez les options nécessaires.  
+ 
+ 
+ 
+Vous pouvez utiliser le menu contextuel (bouton de droit de la souris), pour avoir le 
+menu police.  
+ 
+ 
+Plus de choix 
+d’effets 
+Plus de choix de 
+soulignement 
+Un menu flottant 
+apparaît lorsque vous 
+sélectionnez du 
+texte. 
+Menu contextuel 

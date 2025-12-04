@@ -6,6 +6,7 @@ Pillow  # for PIL
 pandas
 matplotlib
 seaborn
+polars  # for data processing
 # ultralytics  # Requires torch<=2.9.1, install separately with --no-deps
 transformers
 # torch  # Already installed: 2.10.0.dev20251118+cu130

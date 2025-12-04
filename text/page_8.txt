@@ -1,56 +1,16 @@
-38
-L E  TO U R  D E S  G R A N D S  L AC S  A L P I N S  N AT U R E L S  E N  8 0  Q U E S T I O N S
-Par leur dimension, leur histoire, leur localisation à l’échelle du continent européen ainsi que le 
-contexte local, les grands lacs alpins constituent des habitats remarquables pour les poissons. 
-On y trouve un peuplement de poissons original : des espèces d’eau froide en limite sud de leur 
-aire de répartition, ainsi que des espèces d’eau tempérée. Certaines de ces espèces ont une 
-forte valeur patrimoniale, socio-économique ou écologique.
-Combien d’espèces sont présentes et d’où viennent-elles ?
-La richesse spécifique* des grands lacs alpins est actuellement d’une vingtaine d’espèces, mais la composition en 
-espèces d’un écosystème n’est jamais stable et les lacs n’échappent pas à cette règle.
-Un peu d’histoire
-Historiquement, la colonisation du milieu lacustre par les poissons s’est faite par les cours d’eau, lors des périodes 
-qui ont suivi les mouvements géologiques et la soudaine mise en relation des lacs avec les cours d’eau (voir 
-question 2-01 : La vie dans les lacs : comment est-elle arrivée ?). Les lacs sont par la suite devenus des habitats 
-isolés des zones aval. La richesse spécifique est donc naturellement plus faible que dans ces zones aval, qui 
-peuvent renfermer plus de 60 espèces.
-Des espèces sous influence de 
-l’activité humaine
-La composition des peuplements a été 
-modifiée par les activités humaines, 
-certaines espèces étant introduites, 
-volontairement ou accidentellement, 
-d’autres pouvant disparaître sous 
-les diverses pressions anthropiques 
-(humaines). Les populations d’ombles 
-chevalier (photo 1) et de corégones 
-ont ainsi été proches de l’extinction 
-lors des périodes d’eutrophisation* 
-et certaines souches (sous espèces) 
-ont même disparu. À l’opposé, 
-des espèces introduites peuvent 
-s’implanter, comme la grémille, la 
-perche soleil, le poisson-chat ou le 
-sandre dans le lac du Bourget, ou plus 
-récemment la blennie dans le Léman. 
-À l’origine, la richesse spécifique était 
-moindre qu’actuellement et, dans le cas des lacs alpins, la richesse n’est pas un bon indicateur de qualité.
-Des espèces qui migrent ou pas lors de leur cycle de vie
-Les espèces présentes sont pour la plupart liées au milieu lacustre et bouclent leur cycle de vie dans le lac. 
-Certaines peuvent néanmoins effectuer des incursions dans les parties basses des affluents, voire s’y reproduire, 
-comme le chevaine. En revanche, dans les lacs alpins, la truite de lac migre obligatoirement dans les cours d’eau 
-pour se reproduire. Enfin, des migrations en aval des lacs ont probablement lieu.
-Des espèces emblématiques des eaux froides profondes
-L’omble chevalier et le corégone, deux espèces présentes dans tous les grands lacs alpins
-Certaines espèces de poissons d’eau froide ont trouvé dans les eaux profondes des refuges thermiques à la fin 
-des glaciations, il y a près de 14 000 ans. Le Léman et le lac du Bourget renferment depuis cette période deux 
-espèces, l’omble chevalier et le corégone (photo 2) (appelé féra au Léman et au lac d’Annecy, et lavaret au lac 
-du Bourget et d’Aiguebelette). Le corégone a été introduit dans les lacs d’Annecy et d’Aiguebelette à la fin du 
-xixe siècle. L’introduction de l’omble chevalier a eu lieu sur cette même période dans le lac d’Annecy. 
-biologie e t écologie
-2-04 Quels poissons vivent dans 
-les lacs ?
- 
-
-Jean Guillard, Christian Gillet, Emilien Lasne, INRA CARRTEL •
-Photo 1 – Omble chevalier (© J.-L. Bertoncello)
+ 
+GUIDE Word 2013 (version débutante) 
+- 8 - 
+Marie-Josée Tondreau 
+Conseillère pédagogique TIC 
+819 762-0931 poste 1489 
+mariejosee.tondreau@cegepat.qc.ca 
+8. Modifier les paragraphes 
+Modifier les paragraphes veut dire, modifier les alignements (droit, centré, gauche, 
+justifié), faire des espacements entre les paragraphes… 
+ 
+Pour utiliser ces fonctions, vous devez tout d’abord sélectionner le ou les paragraphes 
+puis utiliser le ruban « Accueil ».  
+ 
+Vous pouvez aussi utiliser le menu contextuel (bouton de droit de la souris). 
+Menu contextuel 
