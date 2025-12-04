@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1">
+        <animate attributeName="stop-color" values="#00d4ff;#0099ff;#00d4ff" dur="3s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" style="stop-color:#0099ff;stop-opacity:1">
+        <animate attributeName="stop-color" values="#0099ff;#00d4ff;#0099ff" dur="3s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <linearGradient id="neuralGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#feca57;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#48dbfb;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#neuralGradient)" stroke-width="2" opacity="0.3">
+    <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="20s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Neural Network Background -->
+  <g opacity="0.2">
+    <!-- Nodes -->
+    <circle cx="50" cy="60" r="3" fill="#00d4ff">
+      <animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="150" cy="60" r="3" fill="#00d4ff">
+      <animate attributeName="r" values="3;5;3" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="50" cy="140" r="3" fill="#00d4ff">
+      <animate attributeName="r" values="3;5;3" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="150" cy="140" r="3" fill="#00d4ff">
+      <animate attributeName="r" values="3;5;3" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Connections -->
+    <line x1="50" y1="60" x2="100" y2="100" stroke="#00d4ff" stroke-width="1">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="150" y1="60" x2="100" y2="100" stroke="#00d4ff" stroke-width="1">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.5s" repeatCount="indefinite"/>
+    </line>
+    <line x1="50" y1="140" x2="100" y2="100" stroke="#00d4ff" stroke-width="1">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="150" y1="140" x2="100" y2="100" stroke="#00d4ff" stroke-width="1">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.2s" repeatCount="indefinite"/>
+    </line>
+  </g>
+  
+  <!-- Brain Icon with DNA helix -->
+  <g filter="url(#glow)">
+    <!-- Left Brain Hemisphere -->
+    <path d="M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z" 
+          fill="url(#brainGradient)" opacity="0.9">
+      <animate attributeName="d" 
+               values="M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z;
+                       M 70 100 Q 58 80, 70 58 Q 82 48, 92 53 Q 87 70, 82 87 Q 75 95, 70 100 Z;
+                       M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z" 
+               dur="4s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Right Brain Hemisphere -->
+    <path d="M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z" 
+          fill="url(#brainGradient)" opacity="0.9">
+      <animate attributeName="d" 
+               values="M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z;
+                       M 130 100 Q 142 80, 130 58 Q 118 48, 108 53 Q 113 70, 118 87 Q 125 95, 130 100 Z;
+                       M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z" 
+               dur="4s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Brain Stem -->
+    <path d="M 90 100 Q 95 110, 100 115 Q 105 110, 110 100" 
+          fill="none" stroke="url(#brainGradient)" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Neural Synapses (small circles) -->
+    <circle cx="75" cy="70" r="2" fill="#00d4ff">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="85" cy="80" r="2" fill="#00d4ff">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="115" cy="80" r="2" fill="#00d4ff">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="125" cy="70" r="2" fill="#00d4ff">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2.3s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- DNA Helix wrapping around -->
+  <g opacity="0.6">
+    <path d="M 85 120 Q 95 130, 100 135 Q 105 130, 115 120" 
+          fill="none" stroke="#ff6b6b" stroke-width="2">
+      <animate attributeName="d" 
+               values="M 85 120 Q 95 130, 100 135 Q 105 130, 115 120;
+                       M 85 118 Q 95 128, 100 133 Q 105 128, 115 118;
+                       M 85 120 Q 95 130, 100 135 Q 105 130, 115 120" 
+               dur="2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M 85 125 Q 95 135, 100 140 Q 105 135, 115 125" 
+          fill="none" stroke="#feca57" stroke-width="2">
+      <animate attributeName="d" 
+               values="M 85 125 Q 95 135, 100 140 Q 105 135, 115 125;
+                       M 85 127 Q 95 137, 100 142 Q 105 137, 115 127;
+                       M 85 125 Q 95 135, 100 140 Q 105 135, 115 125" 
+               dur="2s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  
+  <!-- Central Pulse -->
+  <circle cx="100" cy="100" r="5" fill="#00d4ff" opacity="0.8">
+    <animate attributeName="r" values="5;8;5" dur="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Orbiting Data Particles -->
+  <g>
+    <circle cx="100" cy="60" r="3" fill="#ff6b6b">
+      <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="140" cy="100" r="3" fill="#feca57">
+      <animateTransform attributeName="transform" type="rotate" from="120 100 100" to="480 100 100" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="100" cy="140" r="3" fill="#48dbfb">
+      <animateTransform attributeName="transform" type="rotate" from="240 100 100" to="600 100 100" dur="5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- Text -->
+  <text x="100" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
+        fill="url(#brainGradient)" text-anchor="middle">
+    LifeModo
+  </text>
+  <text x="100" y="190" font-family="Arial, sans-serif" font-size="10" 
+        fill="#666" text-anchor="middle">
+    AI LAB
+  </text>
+</svg>

@@ -160,8 +160,17 @@ if os.path.exists(TESSERACT_CMD):
 else:
     st.warning(f"⚠️ Exécutable Tesseract non trouvé à {TESSERACT_CMD}. Veuillez installer Tesseract OCR et ajuster le chemin.")
 
-st.set_page_config(page_title="LifeModo AI Lab Multimodal v2.0", layout="wide")
-st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
+st.set_page_config(page_title="LifeModo AI Lab Multimodal v2.0", layout="wide", page_icon="🧬")
+
+# Afficher le logo en haut
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    with open("logo.svg", "r") as f:
+        logo_svg = f.read()
+    st.markdown(f'<div style="text-align: center;">{logo_svg}</div>', unsafe_allow_html=True)
+with col_title:
+    st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
+    st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab) • [Landing Page](landing_page.html)")
 
 # Gestion de l'état
 if os.path.exists(STATUS_FILE):

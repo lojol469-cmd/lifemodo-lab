@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeModo AI Lab - Landing Page</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .particle {
+            position: absolute;
+            background: radial-gradient(circle, rgba(0,212,255,0.8) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 20s infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(100px, -100px) scale(1.2); }
+            50% { transform: translate(-50px, -150px) scale(0.8); }
+            75% { transform: translate(150px, -80px) scale(1.1); }
+        }
+        
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 0;
+            animation: fadeInDown 1s ease;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo-container svg {
+            width: 60px;
+            height: 60px;
+            filter: drop-shadow(0 0 20px rgba(0,212,255,0.5));
+        }
+        
+        .logo-text {
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 3s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(45deg); }
+        }
+        
+        nav {
+            display: flex;
+            gap: 30px;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        nav a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b);
+            transition: width 0.3s;
+        }
+        
+        nav a:hover::after {
+            width: 100%;
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 100px 0;
+            animation: fadeIn 1.5s ease;
+        }
+        
+        .hero h1 {
+            font-size: 72px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #00d4ff, #0099ff, #ff6b6b, #feca57);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientFlow 5s ease infinite;
+        }
+        
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .hero .subtitle {
+            font-size: 24px;
+            color: #a0aec0;
+            margin-bottom: 40px;
+            animation: fadeInUp 2s ease;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            animation: fadeInUp 2.5s ease;
+        }
+        
+        .btn {
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.4s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,212,255,0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,212,255,0.6);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid #00d4ff;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(0,212,255,0.1);
+            transform: translateY(-5px);
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 80px 0;
+            animation: fadeIn 2s ease;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 60px;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 40px;
+            transition: all 0.4s;
+            animation: fadeInUp 1s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0,212,255,0.3);
+            border-color: rgba(0,212,255,0.5);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: inline-block;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .feature-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+        
+        .feature-card p {
+            color: #a0aec0;
+            line-height: 1.6;
+        }
+        
+        /* Stats Section */
+        .stats {
+            text-align: center;
+            padding: 80px 0;
+            background: rgba(255,255,255,0.02);
+            animation: fadeIn 2.5s ease;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            margin-top: 40px;
+        }
+        
+        .stat-item {
+            animation: fadeInUp 2s ease;
+        }
+        
+        .stat-number {
+            font-size: 64px;
+            font-weight: 900;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: countUp 2s ease;
+        }
+        
+        .stat-label {
+            font-size: 18px;
+            color: #a0aec0;
+            margin-top: 10px;
+        }
+        
+        /* Comparison Table */
+        .comparison {
+            padding: 80px 0;
+            animation: fadeIn 3s ease;
+        }
+        
+        .comparison h2 {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 60px;
+            background: linear-gradient(45deg, #feca57, #ff6b6b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .comparison-table {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th {
+            background: rgba(0,212,255,0.1);
+            font-weight: 700;
+            color: #00d4ff;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .check { color: #48dbfb; font-size: 20px; }
+        .cross { color: #ff6b6b; font-size: 20px; }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 60px 0;
+            background: rgba(0,0,0,0.3);
+            animation: fadeIn 3.5s ease;
+        }
+        
+        .download-btn {
+            margin-top: 40px;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @media print {
+            body { background: white; color: black; }
+            .bg-animation { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="particle" style="width: 100px; height: 100px; top: 10%; left: 20%; animation-delay: 0s;"></div>
+        <div class="particle" style="width: 150px; height: 150px; top: 50%; left: 70%; animation-delay: 2s;"></div>
+        <div class="particle" style="width: 80px; height: 80px; top: 80%; left: 30%; animation-delay: 4s;"></div>
+        <div class="particle" style="width: 120px; height: 120px; top: 30%; left: 80%; animation-delay: 1s;"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-container">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+                    <defs>
+                        <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1">
+                                <animate attributeName="stop-color" values="#00d4ff;#0099ff;#00d4ff" dur="3s" repeatCount="indefinite"/>
+                            </stop>
+                            <stop offset="100%" style="stop-color:#0099ff;stop-opacity:1">
+                                <animate attributeName="stop-color" values="#0099ff;#00d4ff;#0099ff" dur="3s" repeatCount="indefinite"/>
+                            </stop>
+                        </linearGradient>
+                    </defs>
+                    <g>
+                        <path d="M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z" fill="url(#brainGradient)" opacity="0.9">
+                            <animate attributeName="d" values="M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z;M 70 100 Q 58 80, 70 58 Q 82 48, 92 53 Q 87 70, 82 87 Q 75 95, 70 100 Z;M 70 100 Q 60 80, 70 60 Q 80 50, 90 55 Q 85 70, 80 85 Q 75 95, 70 100 Z" dur="4s" repeatCount="indefinite"/>
+                        </path>
+                        <path d="M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z" fill="url(#brainGradient)" opacity="0.9">
+                            <animate attributeName="d" values="M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z;M 130 100 Q 142 80, 130 58 Q 118 48, 108 53 Q 113 70, 118 87 Q 125 95, 130 100 Z;M 130 100 Q 140 80, 130 60 Q 120 50, 110 55 Q 115 70, 120 85 Q 125 95, 130 100 Z" dur="4s" repeatCount="indefinite"/>
+                        </path>
+                        <circle cx="100" cy="100" r="5" fill="#00d4ff" opacity="0.8">
+                            <animate attributeName="r" values="5;8;5" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>
+                    </g>
+                </svg>
+                <div class="logo-text">LifeModo AI Lab</div>
+            </div>
+            <nav>
+                <a href="#features">Fonctionnalités</a>
+                <a href="#comparison">Comparaison</a>
+                <a href="https://github.com/lojol469-cmd/lifemodo-lab">GitHub</a>
+            </nav>
+        </header>
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>Le Premier Laboratoire IA<br/>avec Mode Séparé par Document</h1>
+            <p class="subtitle">De l'upload PDF à un modèle IA déployable en 5 clics • Gratuit • Local • Sans DevOps</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/lojol469-cmd/lifemodo-lab" class="btn btn-primary">🚀 Commencer Maintenant</a>
+                <a href="#features" class="btn btn-secondary">🎬 Voir la Démo</a>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="features">
+            <h2>🌟 Fonctionnalités Uniques</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🗂️</div>
+                    <h3>Mode Séparé Révolutionnaire</h3>
+                    <p>Chaque PDF génère automatiquement son propre modèle Vision + LLM. Aucun mélange de données.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3>LLM Fine-Tuning avec LoRA</h3>
+                    <p>Adaptez Phi-2 (2.7B) sur vos documents avec quantization 4-bit. RAM : 6 GB au lieu de 24 GB.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👁️</div>
+                    <h3>Vision YOLO Automatique</h3>
+                    <p>Extraction, annotation OCR, entraînement YOLOv8n sans une ligne de code.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📤</div>
+                    <h3>Export Multi-Formats</h3>
+                    <p>ONNX, CoreML, TorchScript, OpenVINO générés automatiquement après entraînement.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎵</div>
+                    <h3>Audio Generation</h3>
+                    <p>Fine-tuning MusicGen pour génération audio personnalisée sur vos samples.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>100% Local</h3>
+                    <p>Vos données ne quittent jamais votre machine. Privacy absolue. Conformité RGPD garantie.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats">
+            <h2>📊 Performances en Chiffres</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">5 min</div>
+                    <div class="stat-label">Setup Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">$0</div>
+                    <div class="stat-label">Coût Total</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">4+</div>
+                    <div class="stat-label">Formats Export</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Local & Privacy</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparison Table -->
+        <section class="comparison" id="comparison">
+            <h2>🏆 VS Industrie</h2>
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>LifeModo Lab</th>
+                            <th>AWS SageMaker</th>
+                            <th>Google Vertex AI</th>
+                            <th>Azure ML</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Setup Time</strong></td>
+                            <td>5 min <span class="check">✓</span></td>
+                            <td>2-3 heures</td>
+                            <td>1-2 heures</td>
+                            <td>2-3 heures</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Coût</strong></td>
+                            <td>Gratuit <span class="check">✓</span></td>
+                            <td>$1-5/heure</td>
+                            <td>$1-4/heure</td>
+                            <td>$1-5/heure</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Vision Training</strong></td>
+                            <td><span class="check">✓</span> YOLOv8</td>
+                            <td><span class="check">✓</span> Custom</td>
+                            <td><span class="check">✓</span> AutoML</td>
+                            <td><span class="check">✓</span> Custom</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LLM Fine-tuning</strong></td>
+                            <td><span class="check">✓</span> LoRA Phi-2</td>
+                            <td><span class="cross">✗</span> Bedrock only</td>
+                            <td><span class="cross">✗</span> PaLM only</td>
+                            <td><span class="cross">✗</span> OpenAI only</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Audio Training</strong></td>
+                            <td><span class="check">✓</span> MusicGen</td>
+                            <td><span class="cross">✗</span></td>
+                            <td><span class="cross">✗</span></td>
+                            <td><span class="cross">✗</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mode Séparé</strong></td>
+                            <td><span class="check">✓</span> Unique</td>
+                            <td><span class="cross">✗</span></td>
+                            <td><span class="cross">✗</span></td>
+                            <td><span class="cross">✗</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Export Formats</strong></td>
+                            <td><span class="check">✓</span> 4+ formats</td>
+                            <td>ONNX only</td>
+                            <td>TFLite</td>
+                            <td>ONNX</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Local/Offline</strong></td>
+                            <td><span class="check">✓</span> 100%</td>
+                            <td><span class="cross">✗</span> Cloud</td>
+                            <td><span class="cross">✗</span> Cloud</td>
+                            <td><span class="cross">✗</span> Cloud</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Privacy</strong></td>
+                            <td><span class="check">✓</span> Total</td>
+                            <td><span class="cross">⚠️</span> Cloud</td>
+                            <td><span class="cross">⚠️</span> Cloud</td>
+                            <td><span class="cross">⚠️</span> Cloud</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <h2>🚀 Prêt à Révolutionner Votre IA ?</h2>
+            <p style="margin: 20px 0; color: #a0aec0;">Rejoignez la communauté et créez vos propres modèles IA en minutes.</p>
+            <div class="download-btn">
+                <a href="https://github.com/lojol469-cmd/lifemodo-lab" class="btn btn-primary">⬇️ Télécharger LifeModo AI Lab</a>
+            </div>
+            <p style="margin-top: 40px; color: #666;">Made with 🔥 in Gabon 🇬🇦 • MIT License • 2025</p>
+            <p style="margin-top: 10px; color: #666;">
+                <a href="https://github.com/lojol469-cmd" style="color: #00d4ff; text-decoration: none;">GitHub</a> • 
+                <a href="mailto:lojol469@gmail.com" style="color: #00d4ff; text-decoration: none;">Contact</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Print to PDF functionality
+        function downloadPDF() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
