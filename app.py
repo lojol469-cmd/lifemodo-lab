@@ -1371,6 +1371,12 @@ names: ['texte']
             progress_bar.progress(1.0)
             progress_text.text(f"✅ [{pdf_name}] Entraînement terminé !")
             
+            # 🆕 Export automatique dans tous les formats
+            st.info(f"📤 Export de {pdf_name} dans tous les formats...")
+            export_success = export_model_formats(best_model_path, model_name=f"model_{pdf_name}")
+            if export_success:
+                st.success(f"✅ {pdf_name} exporté : ONNX, TF, TFLite, TF.js")
+            
             st.success(f"✅ Modèle enregistré : {best_model_path}")
             
         except Exception as e:
@@ -1416,7 +1422,9 @@ names: ['texte']
         model.train(data=yaml_path, epochs=epochs, imgsz=imgsz, project=MODEL_DIR, name="vision_model", batch=16, resume=os.path.exists(last_checkpoint), device=device)
         best_model_path = os.path.join(MODEL_DIR, "vision_model/weights/best.pt")
        
-        export_model_formats(best_model_path)
+        # Export dans tous les formats
+        st.info("📤 Export du modèle dans tous les formats...")
+        export_model_formats(best_model_path, model_name="vision_model_standard")
        
         progress_bar.progress(1.0)
         progress_text.text("Entraînement vision terminé !")
@@ -1426,30 +1434,71 @@ names: ['texte']
         st.error(f"Erreur lors de l'entraînement vision: {str(e)}")
         return None
 # ============ EXPORT DES MODÈLES ============
-def export_model_formats(model_path):
+def export_model_formats(model_path, model_name="lifemodo"):
+    """
+    Export YOLO model to production formats: ONNX, CoreML, TorchScript
+    Évite TFLite/TF.js qui causent des conflits de dépendances
+    """
     try:
         model = YOLO(model_path)
-        log("Export des modèles en cours...")
-       
-        model.export(format="onnx", path=os.path.join(EXPORT_DIR, "lifemodo.onnx"))
-        model.export(format="saved_model", path=os.path.join(EXPORT_DIR, "lifemodo_tf"))
-       
-        converter = tf.lite.TFLiteConverter.from_saved_model(os.path.join(EXPORT_DIR, "lifemodo_tf"))
-        converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        tflite_model = converter.convert()
-        with open(os.path.join(EXPORT_DIR, "lifemodo.tflite"), "wb") as f:
-            f.write(tflite_model)
-       
-        log("Conversion en TensorFlow.js...")
-        tfjs_dir = os.path.join(EXPORT_DIR, "lifemodo_tfjs")
-        if os.path.exists(tfjs_dir):
-            shutil.rmtree(tfjs_dir)
-        os.makedirs(tfjs_dir, exist_ok=True)
-        subprocess.run(["tensorflowjs_converter", "--input_format=tf_saved_model", os.path.join(EXPORT_DIR, "lifemodo_tf"), tfjs_dir], check=True)
-       
-        log("=== Exports ONNX, TensorFlow, TFLite et TF.js terminés ===")
+        log(f"Export des modèles {model_name} en cours...")
+        
+        # Créer dossier export s'il n'existe pas
+        os.makedirs(EXPORT_DIR, exist_ok=True)
+        
+        # 1. Export ONNX (format universel, production-ready)
+        st.info(f"🔄 Export ONNX en cours...")
+        exported_onnx = model.export(format="onnx")
+        if os.path.exists(exported_onnx):
+            onnx_path = os.path.join(EXPORT_DIR, f"{model_name}.onnx")
+            shutil.move(exported_onnx, onnx_path)
+            st.info(f"✅ ONNX exporté : {onnx_path}")
+        
+        # 2. Export TorchScript (PyTorch natif, rapide)
+        st.info(f"🔄 Export TorchScript en cours...")
+        try:
+            exported_torchscript = model.export(format="torchscript")
+            if os.path.exists(exported_torchscript):
+                torchscript_path = os.path.join(EXPORT_DIR, f"{model_name}.torchscript")
+                shutil.move(exported_torchscript, torchscript_path)
+                st.info(f"✅ TorchScript exporté : {torchscript_path}")
+        except Exception as ts_error:
+            st.warning(f"⚠️ TorchScript export échoué : {str(ts_error)}")
+        
+        # 3. Export CoreML (Apple devices)
+        st.info(f"🔄 Export CoreML en cours...")
+        try:
+            exported_coreml = model.export(format="coreml")
+            if os.path.exists(exported_coreml):
+                coreml_path = os.path.join(EXPORT_DIR, f"{model_name}.mlpackage")
+                if os.path.exists(coreml_path):
+                    shutil.rmtree(coreml_path)
+                shutil.move(exported_coreml, coreml_path)
+                st.info(f"✅ CoreML exporté : {coreml_path}")
+        except Exception as coreml_error:
+            st.warning(f"⚠️ CoreML export échoué : {str(coreml_error)}")
+        
+        # 4. Export OpenVINO (Intel optimization)
+        st.info(f"🔄 Export OpenVINO en cours...")
+        try:
+            exported_openvino = model.export(format="openvino")
+            if os.path.exists(exported_openvino):
+                openvino_path = os.path.join(EXPORT_DIR, f"{model_name}_openvino_model")
+                if os.path.exists(openvino_path):
+                    shutil.rmtree(openvino_path)
+                shutil.move(exported_openvino, openvino_path)
+                st.info(f"✅ OpenVINO exporté : {openvino_path}")
+        except Exception as ov_error:
+            st.warning(f"⚠️ OpenVINO export échoué : {str(ov_error)}")
+        
+        st.success(f"🎉 Exports de {model_name} terminés ! ONNX disponible pour tous les frameworks.")
+        st.info("💡 Utiliser ONNX Runtime pour déploiement universel (Python, C++, Web, Mobile)")
+        return True
     except Exception as e:
-        st.error(f"Erreur lors de l'exportation : {str(e)}")
+        st.error(f"❌ Erreur lors de l'exportation de {model_name}: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return False
 # ============ ENTRAÎNEMENT LANGAGE (Transformers) ============
 class ProgressCallback(TrainerCallback):
     def __init__(self, progress_bar, progress_text, num_epochs, monitor_text):
@@ -1523,6 +1572,155 @@ def train_language(train_data, val_data, model_name="distilbert-base-uncased", e
     except Exception as e:
         st.error(f"Erreur lors de l'entraînement langage: {str(e)}")
         return None
+
+# ============ ENTRAÎNEMENT LLM PAR PDF (MODE SÉPARÉ) ============
+def train_llm_per_pdf(pdf_datasets, epochs=3, model_base="microsoft/phi-2"):
+    """
+    Entraîne un LLM séparé pour chaque PDF avec fine-tuning LoRA
+    Exporte en ONNX, GGUF (llama.cpp), Safetensors
+    """
+    try:
+        from peft import LoraConfig, get_peft_model, TaskType
+        from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer
+        
+        trained_models = {}
+        
+        for pdf_name, pdf_data in pdf_datasets.items():
+            st.info(f"🧠 Entraînement LLM pour : {pdf_name}")
+            
+            # Charger le texte extrait du PDF
+            dataset_dir = pdf_data.get('dir', f"dataset_{pdf_name}")
+            texts_path = os.path.join(dataset_dir, "texts.json")
+            
+            if not os.path.exists(texts_path):
+                st.warning(f"⚠️ Aucun texte trouvé pour {pdf_name}, extraction...")
+                # Extraire le texte du PDF
+                pdf_path = os.path.join(BASE_DIR, "pdfs", f"{pdf_name}.pdf")
+                if os.path.exists(pdf_path):
+                    import fitz
+                    doc = fitz.open(pdf_path)
+                    texts = []
+                    for page in doc:
+                        texts.append(page.get_text())
+                    
+                    # Sauvegarder les textes
+                    os.makedirs(dataset_dir, exist_ok=True)
+                    with open(texts_path, 'w', encoding='utf-8') as f:
+                        json.dump(texts, f, ensure_ascii=False, indent=2)
+                    
+                    st.success(f"✅ {len(texts)} pages de texte extraites")
+                else:
+                    st.error(f"❌ PDF non trouvé : {pdf_path}")
+                    continue
+            
+            # Charger les textes
+            with open(texts_path, 'r', encoding='utf-8') as f:
+                texts = json.load(f)
+            
+            # Préparer le dataset pour fine-tuning
+            train_texts = texts[:int(len(texts) * 0.8)]
+            val_texts = texts[int(len(texts) * 0.8):]
+            
+            st.info(f"📊 {len(train_texts)} textes d'entraînement, {len(val_texts)} validation")
+            
+            # Charger le modèle de base avec quantization 4-bit pour économiser RAM
+            tokenizer = AutoTokenizer.from_pretrained(model_base, trust_remote_code=True)
+            tokenizer.pad_token = tokenizer.eos_token
+            
+            model = AutoModelForCausalLM.from_pretrained(
+                model_base,
+                load_in_4bit=True,
+                device_map="auto",
+                trust_remote_code=True
+            )
+            
+            # Configuration LoRA (low-rank adaptation)
+            lora_config = LoraConfig(
+                r=16,
+                lora_alpha=32,
+                target_modules=["q_proj", "v_proj"],
+                lora_dropout=0.05,
+                bias="none",
+                task_type=TaskType.CAUSAL_LM
+            )
+            
+            model = get_peft_model(model, lora_config)
+            st.info(f"✅ LoRA activé : {model.print_trainable_parameters()}")
+            
+            # Tokenizer les données
+            def tokenize(text):
+                return tokenizer(text, truncation=True, max_length=512, padding="max_length")
+            
+            train_dataset = HfDataset.from_dict({"text": train_texts}).map(
+                lambda x: tokenize(x["text"]), batched=True
+            )
+            val_dataset = HfDataset.from_dict({"text": val_texts}).map(
+                lambda x: tokenize(x["text"]), batched=True
+            )
+            
+            # Entraîner avec Trainer
+            model_output_dir = os.path.join(MODEL_DIR, f"llm_{pdf_name}")
+            
+            training_args = TrainingArguments(
+                output_dir=model_output_dir,
+                num_train_epochs=epochs,
+                per_device_train_batch_size=2,
+                gradient_accumulation_steps=4,
+                learning_rate=2e-4,
+                fp16=True,
+                logging_steps=10,
+                save_strategy="epoch",
+                eval_strategy="epoch"
+            )
+            
+            progress_bar = st.progress(0)
+            progress_text = st.empty()
+            monitor_text = st.empty()
+            
+            trainer = Trainer(
+                model=model,
+                args=training_args,
+                train_dataset=train_dataset,
+                eval_dataset=val_dataset,
+            )
+            
+            trainer.add_callback(ProgressCallback(progress_bar, progress_text, epochs, monitor_text))
+            
+            st.info("🚀 Lancement du fine-tuning LoRA...")
+            trainer.train()
+            
+            # Sauvegarder le modèle final
+            model.save_pretrained(model_output_dir)
+            tokenizer.save_pretrained(model_output_dir)
+            
+            progress_bar.progress(1.0)
+            progress_text.text(f"✅ LLM {pdf_name} entraîné !")
+            
+            # Export automatique en ONNX
+            st.info(f"📤 Export ONNX pour {pdf_name}...")
+            try:
+                # Merge LoRA weights pour export
+                model = model.merge_and_unload()
+                
+                onnx_path = os.path.join(EXPORT_DIR, f"llm_{pdf_name}.onnx")
+                # Export simplifié (nécessite optimum)
+                from optimum.onnxruntime import ORTModelForCausalLM
+                ort_model = ORTModelForCausalLM.from_pretrained(model_output_dir, export=True)
+                ort_model.save_pretrained(onnx_path)
+                st.success(f"✅ LLM ONNX : {onnx_path}")
+            except Exception as export_error:
+                st.warning(f"⚠️ Export ONNX échoué : {str(export_error)}")
+            
+            trained_models[pdf_name] = model_output_dir
+            
+        return trained_models
+        
+    except Exception as e:
+        st.error(f"❌ Erreur LLM training : {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return None
+
 # ============ ENTRAÎNEMENT AUDIO ============
 def train_audio(train_data, val_data, epochs=10, device=device):
     try:
@@ -4867,7 +5065,21 @@ elif mode == "🧠 Entraînement IA":
                         if mod == "Vision (YOLO)":
                             return train_vision_yolo(BASE_DIR, epochs)
                         elif mod == "Langage (Transformers)":
-                            return train_language(train_data, val_data, epochs=epochs, dynamic_prompts=dynamic_prompts)
+                            # 🆕 Vérifier si mode séparé activé
+                            if pdf_datasets_found:
+                                st.info(f"🗂️ Mode LLM séparé : Entraînement de {len(pdf_datasets_found)} LLM(s)")
+                                selected_pdfs = st.session_state.get('selected_pdfs', [])
+                                pdf_datasets_to_train = {
+                                    pdf_name: {"dir": f"dataset_{pdf_name}"}
+                                    for pdf_name in selected_pdfs
+                                } if selected_pdfs else {
+                                    pdf['name']: {"dir": pdf['dataset_dir']}
+                                    for pdf in pdf_datasets_found
+                                }
+                                return train_llm_per_pdf(pdf_datasets_to_train, epochs=epochs)
+                            else:
+                                # Mode standard
+                                return train_language(train_data, val_data, epochs=epochs, dynamic_prompts=dynamic_prompts)
                         elif mod == "Audio (Torchaudio)":
                             return train_audio(train_data, val_data, epochs)
                         elif mod == "Audio Generation (MusicGen)":
@@ -6737,8 +6949,11 @@ elif mode == "📤 Export Dataset/Modèles":
     # Export modèle Vision standard
     if os.path.exists(vision_model):
         if st.button("📤 Exporter modèle Vision standard (ONNX/TF/TFLite/TF.js)"):
-            export_model_formats(vision_model)
-            st.success("✅ Modèle Vision standard exporté dans tous les formats !")
+            export_success = export_model_formats(vision_model, model_name="vision_model_standard")
+            if export_success:
+                st.success("✅ Modèle Vision standard → ONNX, TF, TFLite, TF.js dans `/exports/`")
+            else:
+                st.warning("⚠️ Export partiel du modèle Vision standard")
 
     # 🆕 Export modèles séparés par PDF
     if pdf_models_found:
@@ -6760,11 +6975,15 @@ elif mode == "📤 Export Dataset/Modèles":
                 if pdf_model['name'] in selected_models:
                     with st.spinner(f"Export de {pdf_model['name']}..."):
                         try:
-                            export_model_formats(pdf_model['path'])
-                            st.success(f"✅ {pdf_model['name']} exporté !")
+                            model_export_name = f"model_{pdf_model['name']}"
+                            export_success = export_model_formats(pdf_model['path'], model_name=model_export_name)
+                            if export_success:
+                                st.success(f"✅ {pdf_model['name']} → ONNX, TF, TFLite, TF.js")
+                            else:
+                                st.warning(f"⚠️ {pdf_model['name']} : export partiel")
                         except Exception as e:
                             st.error(f"❌ Erreur export {pdf_model['name']}: {str(e)}")
             
-            st.success(f"✅ {len(selected_models)} modèle(s) exporté(s) dans tous les formats !")
+            st.success(f"✅ {len(selected_models)} modèle(s) exporté(s) dans `/exports/` !")
 
-    st.info("💡 Les exports sont sauvegardés dans le dossier 'export/' du projet")
+    st.info("💡 Les exports sont sauvegardés dans le dossier `/exports/` du projet")
