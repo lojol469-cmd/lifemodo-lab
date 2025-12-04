@@ -163,14 +163,14 @@ else:
 st.set_page_config(page_title="LifeModo AI Lab Multimodal v2.0", layout="wide", page_icon="🧬")
 
 # Afficher le logo en haut
-logo_path = os.path.join(BASE_DIR, "logo.svg")
+logo_path = os.path.join(BASE_DIR, "logo_simple.svg")
 if os.path.exists(logo_path):
     col_logo, col_title = st.columns([1, 5])
     with col_logo:
         with open(logo_path, "r", encoding="utf-8") as f:
             logo_svg = f.read()
         # Redimensionner le SVG pour l'affichage
-        logo_svg = logo_svg.replace('width="200"', 'width="80"').replace('height="200"', 'height="80"')
+        logo_svg = logo_svg.replace('width="200"', 'width="100"').replace('height="200"', 'height="100"')
         st.markdown(logo_svg, unsafe_allow_html=True)
     with col_title:
         st.title("🧬 LifeModo AI Lab v2.0")
