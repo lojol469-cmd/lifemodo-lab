@@ -163,14 +163,19 @@ else:
 st.set_page_config(page_title="LifeModo AI Lab Multimodal v2.0", layout="wide", page_icon="🧬")
 
 # Afficher le logo en haut
-col_logo, col_title = st.columns([1, 5])
-with col_logo:
-    with open("logo.svg", "r") as f:
-        logo_svg = f.read()
-    st.markdown(f'<div style="text-align: center;">{logo_svg}</div>', unsafe_allow_html=True)
-with col_title:
+logo_path = os.path.join(BASE_DIR, "logo.svg")
+if os.path.exists(logo_path):
+    col_logo, col_title = st.columns([1, 5])
+    with col_logo:
+        with open(logo_path, "r") as f:
+            logo_svg = f.read()
+        st.markdown(f'<div style="text-align: center;">{logo_svg}</div>', unsafe_allow_html=True)
+    with col_title:
+        st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
+        st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab) • [Landing Page](landing_page.html)")
+else:
     st.title("🧬 LifeModo AI Lab v2.0 – Créateur Multimodal IA : Vision, Langage, Audio")
-    st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab) • [Landing Page](landing_page.html)")
+    st.markdown("*Le Premier Laboratoire IA avec Mode Séparé par Document* • [GitHub](https://github.com/lojol469-cmd/lifemodo-lab)")
 
 # Gestion de l'état
 if os.path.exists(STATUS_FILE):
