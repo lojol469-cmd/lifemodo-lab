@@ -7,6 +7,17 @@
 # Contact: belikan@lifemodo.ai
 # ============================================================
 
+# Désactiver le support TensorFlow dans transformers AVANT tout import
+import os
+import sys
+os.environ['TRANSFORMERS_NO_TF'] = '1'
+os.environ['USE_TF'] = '0'
+
+# Patch pour éviter l'import de TFPreTrainedModel
+import transformers
+if not hasattr(transformers, 'TFPreTrainedModel'):
+    transformers.TFPreTrainedModel = None
+
 # === AJOUTE ÇA EN TOUT HAUT ===
 from utils.rag_ultimate import ask_gabon, build_or_load_index
 
@@ -167,6 +178,7 @@ st.markdown("""
 <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin-bottom: 20px;'>
     <h1 style='color: white; margin: 0; font-size: 3em;'>🧬 LifeModo AI Lab v2.0</h1>
     <p style='color: #f0f0f0; margin: 10px 0 0 0; font-size: 1.2em;'>Le Premier Laboratoire IA avec Mode Séparé par Document</p>
+    <p style='color: #e0e0e0; margin: 5px 0 0 0; font-style: italic;'>« Créés à Son image, Codés dans notre ADN »</p>
     <p style='color: #e0e0e0; margin: 5px 0 0 0;'>🧠 Vision • 💬 LLM • 🎵 Audio • 📊 Multimodal</p>
 </div>
 """, unsafe_allow_html=True)

@@ -63,14 +63,4 @@
   <circle cx="100" cy="60" r="3" fill="#ff6b6b"/>
   <circle cx="140" cy="100" r="3" fill="#feca57"/>
   <circle cx="100" cy="140" r="3" fill="#48dbfb"/>
-  
-  <!-- Text -->
-  <text x="100" y="175" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
-        fill="url(#brainGrad)" text-anchor="middle">
-    LifeModo
-  </text>
-  <text x="100" y="190" font-family="Arial, sans-serif" font-size="10" 
-        fill="#666" text-anchor="middle">
-    AI LAB
-  </text>
 </svg>
